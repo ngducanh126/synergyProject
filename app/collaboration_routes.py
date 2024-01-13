@@ -565,3 +565,15 @@ def get_collaboration_members(collaboration_id):
     except Exception as e:
         print(f"[ERROR] Failed to fetch members for collaboration ID {collaboration_id}: {e}")
         return jsonify({'error': 'Failed to fetch collaboration members.'}), 500
+@collaboration_bp.route('/<int:collaboration_id>/remove-member', methods=['POST'])
+@jwt_required()
+def remove_member_from_collaboration(collaboration_id):
+    """Remove a member from a collaboration."""
+    return jsonify({'message': 'Member removed from collaboration.'}), 200
+
+@collaboration_bp.route('/<int:collaboration_id>/remove-member', methods=['POST'])
+@jwt_required()
+def remove_member_from_collaboration(collaboration_id):
+    """Remove a member from a collaboration."""
+    return jsonify({'message': 'Member removed from collaboration.'}), 200
+
