@@ -577,3 +577,9 @@ def remove_member_from_collaboration(collaboration_id):
     """Remove a member from a collaboration."""
     return jsonify({'message': 'Member removed from collaboration.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/make-admin', methods=['POST'])
+@jwt_required()
+def make_member_admin(collaboration_id):
+    """Promote a member to admin in a collaboration."""
+    return jsonify({'message': 'Member promoted to admin.'}), 200
+
