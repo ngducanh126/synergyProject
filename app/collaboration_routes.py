@@ -589,3 +589,9 @@ def demote_admin_to_member(collaboration_id):
     """Demote an admin to member in a collaboration."""
     return jsonify({'message': 'Admin demoted to member.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/leave', methods=['POST'])
+@jwt_required()
+def leave_collaboration(collaboration_id):
+    """Allow a user to leave a collaboration."""
+    return jsonify({'message': 'You have left the collaboration.'}), 200
+
