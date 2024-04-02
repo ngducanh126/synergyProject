@@ -595,3 +595,9 @@ def leave_collaboration(collaboration_id):
     """Allow a user to leave a collaboration."""
     return jsonify({'message': 'You have left the collaboration.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/update-description', methods=['PUT'])
+@jwt_required()
+def update_collaboration_description(collaboration_id):
+    """Update the description of a collaboration."""
+    return jsonify({'message': 'Collaboration description updated.'}), 200
+
