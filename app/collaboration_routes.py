@@ -601,3 +601,9 @@ def update_collaboration_description(collaboration_id):
     """Update the description of a collaboration."""
     return jsonify({'message': 'Collaboration description updated.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/update-name', methods=['PUT'])
+@jwt_required()
+def update_collaboration_name(collaboration_id):
+    """Update the name of a collaboration."""
+    return jsonify({'message': 'Collaboration name updated.'}), 200
+
