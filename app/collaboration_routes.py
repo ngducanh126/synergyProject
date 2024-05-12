@@ -607,3 +607,9 @@ def update_collaboration_name(collaboration_id):
     """Update the name of a collaboration."""
     return jsonify({'message': 'Collaboration name updated.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/invite', methods=['POST'])
+@jwt_required()
+def invite_user_to_collaboration(collaboration_id):
+    """Invite a user to join a collaboration."""
+    return jsonify({'message': 'User invited to collaboration.'}), 200
+
