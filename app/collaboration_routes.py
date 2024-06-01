@@ -613,3 +613,9 @@ def invite_user_to_collaboration(collaboration_id):
     """Invite a user to join a collaboration."""
     return jsonify({'message': 'User invited to collaboration.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/cancel-invite', methods=['POST'])
+@jwt_required()
+def cancel_invite_to_collaboration(collaboration_id):
+    """Cancel an invitation to a collaboration."""
+    return jsonify({'message': 'Invitation cancelled.'}), 200
+
