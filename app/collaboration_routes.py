@@ -619,3 +619,9 @@ def cancel_invite_to_collaboration(collaboration_id):
     """Cancel an invitation to a collaboration."""
     return jsonify({'message': 'Invitation cancelled.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/list-invites', methods=['GET'])
+@jwt_required()
+def list_collaboration_invites(collaboration_id):
+    """List all pending invites for a collaboration."""
+    return jsonify({'invites': []}), 200
+
