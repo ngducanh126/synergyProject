@@ -625,3 +625,9 @@ def list_collaboration_invites(collaboration_id):
     """List all pending invites for a collaboration."""
     return jsonify({'invites': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/archive', methods=['POST'])
+@jwt_required()
+def archive_collaboration(collaboration_id):
+    """Archive a collaboration."""
+    return jsonify({'message': 'Collaboration archived.'}), 200
+
