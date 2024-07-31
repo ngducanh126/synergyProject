@@ -631,3 +631,9 @@ def archive_collaboration(collaboration_id):
     """Archive a collaboration."""
     return jsonify({'message': 'Collaboration archived.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/unarchive', methods=['POST'])
+@jwt_required()
+def unarchive_collaboration(collaboration_id):
+    """Unarchive a collaboration."""
+    return jsonify({'message': 'Collaboration unarchived.'}), 200
+
