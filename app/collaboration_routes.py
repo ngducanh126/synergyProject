@@ -637,3 +637,9 @@ def unarchive_collaboration(collaboration_id):
     """Unarchive a collaboration."""
     return jsonify({'message': 'Collaboration unarchived.'}), 200
 
+@collaboration_bp.route('/archived', methods=['GET'])
+@jwt_required()
+def list_archived_collaborations():
+    """List all archived collaborations."""
+    return jsonify({'archived_collaborations': []}), 200
+
