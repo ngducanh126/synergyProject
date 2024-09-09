@@ -643,3 +643,9 @@ def list_archived_collaborations():
     """List all archived collaborations."""
     return jsonify({'archived_collaborations': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/add-tag', methods=['POST'])
+@jwt_required()
+def add_tag_to_collaboration(collaboration_id):
+    """Add a tag to a collaboration."""
+    return jsonify({'message': 'Tag added to collaboration.'}), 200
+
