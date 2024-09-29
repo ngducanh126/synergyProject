@@ -649,3 +649,9 @@ def add_tag_to_collaboration(collaboration_id):
     """Add a tag to a collaboration."""
     return jsonify({'message': 'Tag added to collaboration.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/remove-tag', methods=['POST'])
+@jwt_required()
+def remove_tag_from_collaboration(collaboration_id):
+    """Remove a tag from a collaboration."""
+    return jsonify({'message': 'Tag removed from collaboration.'}), 200
+
