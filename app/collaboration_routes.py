@@ -655,3 +655,9 @@ def remove_tag_from_collaboration(collaboration_id):
     """Remove a tag from a collaboration."""
     return jsonify({'message': 'Tag removed from collaboration.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/tags', methods=['GET'])
+@jwt_required()
+def list_collaboration_tags(collaboration_id):
+    """List all tags for a collaboration."""
+    return jsonify({'tags': []}), 200
+
