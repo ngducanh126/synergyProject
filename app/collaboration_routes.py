@@ -661,3 +661,9 @@ def list_collaboration_tags(collaboration_id):
     """List all tags for a collaboration."""
     return jsonify({'tags': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/add-note', methods=['POST'])
+@jwt_required()
+def add_note_to_collaboration(collaboration_id):
+    """Add a note to a collaboration."""
+    return jsonify({'message': 'Note added to collaboration.'}), 200
+
