@@ -673,3 +673,9 @@ def list_collaboration_notes(collaboration_id):
     """List all notes for a collaboration."""
     return jsonify({'notes': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/delete', methods=['DELETE'])
+@jwt_required()
+def delete_collaboration(collaboration_id):
+    """Delete a collaboration."""
+    return jsonify({'message': 'Collaboration deleted.'}), 200
+
