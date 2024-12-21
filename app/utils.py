@@ -1,7 +1,5 @@
-from app import bcrypt
+from flask_jwt_extended import decode_token
 
-def hash_password(password):
-    return bcrypt.generate_password_hash(password).decode('utf-8')
-
-def check_password(hashed_password, password):
-    return bcrypt.check_password_hash(hashed_password, password)
+def get_user_id_from_token(token):
+    decoded_token = decode_token(token)
+    return decoded_token['sub']

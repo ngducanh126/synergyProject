@@ -1,75 +1,53 @@
 import requests
 
-# Base URL of the API
 BASE_URL = "http://127.0.0.1:5000"
 
-# Credentials
-USERNAME = "user10"
-PASSWORD = "hanoihue"
-
-def login():
-    """Logs in and returns the JWT token."""
-    login_url = f"{BASE_URL}/login"
-    login_data = {
-        "username": USERNAME,
-        "password": PASSWORD
+# Step 1: Register User
+def register_user():
+    url = f"{BASE_URL}/auth/register"
+    payload = {
+        "username": "user35",
+        "password": "hanoihue"
     }
+    response = requests.post(url, json=payload)
+    print("Register Response:", response.json())
+    return response.status_code == 201
 
-    print("Logging in...")
-    login_response = requests.post(login_url, json=login_data)
+# Step 2: Login User
+def login_user():
+    url = f"{BASE_URL}/auth/login"
+    payload = {
+        "username": "user30",
+        "password": "hanoihue"
+    }
+    response = requests.post(url, json=payload)
+    print("Login Response:", response.json())
+    if response.status_code == 200:
+        return response.json().get("access_token")
+    return None
 
-    if login_response.status_code == 200:
-        print("Login successful!")
-        return login_response.json().get("token")
-    else:
-        print("Login failed:", login_response.status_code, login_response.text)
-        return None
-
+# Step 3: Update Profile
 def update_profile(token):
-    """Updates the profile with new information."""
-    profile_url = f"{BASE_URL}/profile"
+    url = f"{BASE_URL}/profile/update"
     headers = {
         "Authorization": f"Bearer {token}"
     }
-
-    profile_data = {
-        "bio": "I am an artist passionate about collaborative projects.",
-        "skills": ["Painting", "Sculpture", "Digital Art"],
+    payload = {
+        "bio": "Hello, I am user30!",
+        "skills": ["painting", "drawing"],
         "location": "Hanoi, Vietnam",
         "availability": "Weekends"
     }
+    response = requests.put(url, json=payload, headers=headers)
+    print("Update Profile Response:", response.json())
 
-    print("Updating profile...")
-    update_response = requests.put(profile_url, json=profile_data, headers=headers)
-
-    if update_response.status_code == 200:
-        print("Profile updated successfully!")
-    else:
-        print("Failed to update profile:", update_response.status_code, update_response.text)
-
-def view_profile(token):
-    """Fetches and displays the user's profile."""
-    profile_url = f"{BASE_URL}/profile"
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-
-    print("Fetching profile...")
-    profile_response = requests.get(profile_url, headers=headers)
-
-    if profile_response.status_code == 200:
-        print("Profile Data:")
-        print(profile_response.json())
-    else:
-        print("Failed to fetch profile:", profile_response.status_code, profile_response.text)
-
+# Main Flow
 if __name__ == "__main__":
-    # Log in and get token
-    token = login()
-
-    if token:
-        # Update profile
-        update_profile(token)
-
-        # View updated profile
-        view_profile(token)
+    if register_user():
+        token = login_user()
+        if token:
+            update_profile(token)
+        else:
+            print("Login failed.")
+    else:
+        print("Registration failed.")
