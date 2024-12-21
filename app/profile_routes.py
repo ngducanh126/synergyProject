@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import User
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -9,58 +8,105 @@ profile_bp = Blueprint('profile', __name__)
 @jwt_required()
 def view_profile():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+
+    # Fetch user details
+    query = """
+    SELECT id, username, bio, skills, location, availability, verification_status
+    FROM users
+    WHERE id = :user_id;
+    """
+    user = db.session.execute(query, {'user_id': user_id}).fetchone()
 
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
     user_data = {
-        'id': user.id,
-        'username': user.username,
-        'bio': user.bio,
-        'skills': user.skills,
-        'location': user.location,
-        'availability': user.availability,
-        'verification_status': user.verification_status
+        'id': user[0],
+        'username': user[1],
+        'bio': user[2],
+        'skills': user[3],
+        'location': user[4],
+        'availability': user[5],
+        'verification_status': user[6],
     }
     return jsonify(user_data), 200
+
 
 @profile_bp.route('/update', methods=['PUT'])
 @jwt_required()
 def update_profile():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+
+    # Check if the user exists
+    user_query = "SELECT id FROM users WHERE id = :user_id;"
+    user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
 
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
+    # Update profile data
     data = request.get_json()
-    user.bio = data.get('bio', user.bio)
-    user.skills = data.get('skills', user.skills)
-    user.location = data.get('location', user.location)
-    user.availability = data.get('availability', user.availability)
-
+    update_query = """
+    UPDATE users
+    SET bio = COALESCE(:bio, bio),
+        skills = COALESCE(:skills, skills),
+        location = COALESCE(:location, location),
+        availability = COALESCE(:availability, availability)
+    WHERE id = :user_id;
+    """
+    db.session.execute(
+        update_query,
+        {
+            'bio': data.get('bio'),
+            'skills': data.get('skills'),
+            'location': data.get('location'),
+            'availability': data.get('availability'),
+            'user_id': user_id,
+        },
+    )
     db.session.commit()
     return jsonify({'message': 'Profile updated successfully'}), 200
+
 
 @profile_bp.route('/add', methods=['POST'])
 @jwt_required()
 def add_profile():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+
+    # Check if the user exists and already has profile data
+    user_query = """
+    SELECT bio, skills, location, availability
+    FROM users
+    WHERE id = :user_id;
+    """
+    user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
 
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
     # Prevent adding profile information if it already exists
-    if user.bio or user.skills or user.location or user.availability:
+    if user[0] or user[1] or user[2] or user[3]:
         return jsonify({'message': 'Profile already exists. Use update endpoint to modify it.'}), 400
 
+    # Add new profile data
     data = request.get_json()
-    user.bio = data.get('bio')
-    user.skills = data.get('skills')
-    user.location = data.get('location')
-    user.availability = data.get('availability')
-
+    insert_query = """
+    UPDATE users
+    SET bio = :bio,
+        skills = :skills,
+        location = :location,
+        availability = :availability
+    WHERE id = :user_id;
+    """
+    db.session.execute(
+        insert_query,
+        {
+            'bio': data.get('bio'),
+            'skills': data.get('skills'),
+            'location': data.get('location'),
+            'availability': data.get('availability'),
+            'user_id': user_id,
+        },
+    )
     db.session.commit()
     return jsonify({'message': 'Profile created successfully'}), 201
