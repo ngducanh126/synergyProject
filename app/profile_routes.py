@@ -1,6 +1,10 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
+from werkzeug.utils import secure_filename
+import os
+from flask import send_from_directory
+
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -110,3 +114,132 @@ def add_profile():
     )
     db.session.commit()
     return jsonify({'message': 'Profile created successfully'}), 201
+
+@profile_bp.route('/collections/<int:collection_id>/items', methods=['POST'])
+@jwt_required()
+def add_item_to_collection(collection_id):
+    try:
+        user_id = get_jwt_identity()
+        print(f"[DEBUG] User ID: {user_id}, Collection ID: {collection_id}")
+
+        data = request.form
+        file = request.files.get('file')
+
+        item_type = data.get('type')
+        content = data.get('content')
+
+        print(f"[DEBUG] Adding item - Type: {item_type}, Content: {content}, File: {file.filename if file else 'None'}")
+
+        if file:
+            filename = secure_filename(file.filename)
+            file_path = os.path.join('uploads', filename).replace("\\", "/")  # Normalize file path
+            file.save(file_path)
+            print(f"[DEBUG] File saved at: {file_path}")
+        else:
+            file_path = None
+
+        # Insert into the database
+        query = """
+        INSERT INTO collection_items (collection_id, type, content, file_path)
+        VALUES (:collection_id, :type, :content, :file_path)
+        """
+        db.session.execute(query, {
+            'collection_id': collection_id,
+            'type': item_type,
+            'content': content,
+            'file_path': file_path
+        })
+        db.session.commit()
+
+        print(f"[DEBUG] Item added successfully - Type: {item_type}, Content: {content}, File Path: {file_path}")
+        return jsonify({'message': 'Item added to collection successfully'}), 201
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+@profile_bp.route('/collections', methods=['GET'])
+@jwt_required()
+def get_collections():
+    user_id = get_jwt_identity()
+    print(f"[DEBUG] Fetching collections for user_id: {user_id}")
+
+    query = "SELECT id, name FROM collections WHERE user_id = :user_id"
+    collections = db.session.execute(query, {'user_id': user_id}).fetchall()
+
+    collections_data = [{'id': col[0], 'name': col[1]} for col in collections]
+    print(f"[DEBUG] Retrieved collections: {collections_data}")
+    return jsonify(collections_data), 200
+
+
+@profile_bp.route('/collections/<int:collection_id>', methods=['GET'])
+@jwt_required()
+def get_collection_items(collection_id):
+    try:
+        print(f"[DEBUG] Fetching items for Collection ID: {collection_id}")
+        query = """
+        SELECT id, type, content, file_path FROM collection_items WHERE collection_id = :collection_id
+        """
+        items = db.session.execute(query, {'collection_id': collection_id}).fetchall()
+
+        items_data = []
+        for item in items:
+            normalized_file_path = None
+            if item[3]:
+                # Normalize backslashes to forward slashes
+                normalized_file_path = "http://127.0.0.1:5000/" + item[3].replace("\\", "/")
+            
+            items_data.append({
+                'id': item[0],
+                'type': item[1],
+                'content': item[2],
+                'file_path': normalized_file_path
+            })
+
+        print(f"[DEBUG] Parsed items: {items_data}")
+        return jsonify(items_data), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+@profile_bp.route('/collections/<int:collection_id>', methods=['DELETE'])
+@jwt_required()
+def delete_collection(collection_id):
+    print(f"[DEBUG] Deleting collection_id: {collection_id}")
+
+    query = "DELETE FROM collections WHERE id = :collection_id"
+    db.session.execute(query, {'collection_id': collection_id})
+    db.session.commit()
+
+    print(f"[DEBUG] Collection deleted: {collection_id}")
+    return jsonify({'message': 'Collection deleted successfully'}), 200
+
+
+@profile_bp.route('/collections/<int:collection_id>/items/<int:item_id>', methods=['DELETE'])
+@jwt_required()
+def delete_item(collection_id, item_id):
+    print(f"[DEBUG] Deleting item_id: {item_id} from collection_id: {collection_id}")
+
+    query = """
+    DELETE FROM collection_items WHERE collection_id = :collection_id AND id = :item_id
+    """
+    db.session.execute(query, {'collection_id': collection_id, 'item_id': item_id})
+    db.session.commit()
+
+    print(f"[DEBUG] Item deleted: {item_id} from collection_id: {collection_id}")
+    return jsonify({'message': 'Item deleted successfully'}), 200
+
+
+@profile_bp.route('/uploads/<path:filename>', methods=['GET'])
+def serve_upload(filename):
+    """Serve static files from the uploads directory."""
+    try:
+        upload_folder = os.path.join(os.getcwd(), 'uploads')  # Absolute path to uploads
+        print(f"[DEBUG] Serving file: {filename} from {upload_folder}")
+        return send_from_directory(upload_folder, filename)
+    except Exception as e:
+        print(f"[ERROR] Failed to serve file: {filename}. Error: {e}")
+        return jsonify({'error': 'File not found or inaccessible'}), 404
