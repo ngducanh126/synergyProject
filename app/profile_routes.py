@@ -122,23 +122,35 @@ def add_item_to_collection(collection_id):
         user_id = get_jwt_identity()
         print(f"[DEBUG] User ID: {user_id}, Collection ID: {collection_id}")
 
-        data = request.form
-        file = request.files.get('file')
+        # Check if the request contains a file
+        if 'file' in request.files:
+            # Handle file uploads
+            file = request.files.get('file')
+            item_type = request.form.get('type')
+            content = request.form.get('content')
+            print(f"[DEBUG] Form data (file upload): Type: {item_type}, Content: {content}, File: {file.filename if file else 'None'}")
 
-        item_type = data.get('type')
-        content = data.get('content')
-
-        print(f"[DEBUG] Adding item - Type: {item_type}, Content: {content}, File: {file.filename if file else 'None'}")
-
-        if file:
-            filename = secure_filename(file.filename)
-            file_path = os.path.join('uploads', filename).replace("\\", "/")  # Normalize file path
-            file.save(file_path)
-            print(f"[DEBUG] File saved at: {file_path}")
+            if file:
+                filename = secure_filename(file.filename)
+                file_path = os.path.join('uploads', filename).replace("\\", "/")
+                file.save(file_path)
+                print(f"[DEBUG] File saved at: {file_path}")
+            else:
+                file_path = None
         else:
-            file_path = None
+            # Handle JSON payloads
+            data = request.get_json()
+            item_type = data.get('type')
+            content = data.get('content')
+            file_path = None  # No file for text-based items
+            print(f"[DEBUG] JSON data: Type: {item_type}, Content: {content}")
 
-        # Insert into the database
+        # Ensure mandatory fields are present
+        if not item_type or not content:
+            print("[ERROR] Missing type or content in request")
+            return jsonify({'error': 'Type and content are required fields'}), 400
+
+        # Insert into database
         query = """
         INSERT INTO collection_items (collection_id, type, content, file_path)
         VALUES (:collection_id, :type, :content, :file_path)
@@ -151,8 +163,8 @@ def add_item_to_collection(collection_id):
         })
         db.session.commit()
 
-        print(f"[DEBUG] Item added successfully - Type: {item_type}, Content: {content}, File Path: {file_path}")
-        return jsonify({'message': 'Item added to collection successfully'}), 201
+        print(f"[DEBUG] Item added to database - Type: {item_type}, Content: {content}, File Path: {file_path}")
+        return jsonify({'message': 'Item added to collection successfully', 'file_path': file_path}), 201
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
@@ -178,18 +190,18 @@ def get_collections():
 def get_collection_items(collection_id):
     try:
         print(f"[DEBUG] Fetching items for Collection ID: {collection_id}")
+
         query = """
         SELECT id, type, content, file_path FROM collection_items WHERE collection_id = :collection_id
         """
         items = db.session.execute(query, {'collection_id': collection_id}).fetchall()
+        print(f"[DEBUG] Raw items from database: {items}")
 
         items_data = []
         for item in items:
-            normalized_file_path = None
-            if item[3]:
-                # Normalize backslashes to forward slashes
-                normalized_file_path = "http://127.0.0.1:5000/" + item[3].replace("\\", "/")
-            
+            normalized_file_path = f"http://127.0.0.1:5000/uploads/{item[3]}" if item[3] else None
+            print(f"[DEBUG] Normalizing file path: {item[3]} -> {normalized_file_path}")
+
             items_data.append({
                 'id': item[0],
                 'type': item[1],
@@ -197,12 +209,11 @@ def get_collection_items(collection_id):
                 'file_path': normalized_file_path
             })
 
-        print(f"[DEBUG] Parsed items: {items_data}")
+        print(f"[DEBUG] Items data prepared for response: {items_data}")
         return jsonify(items_data), 200
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
-
 
 
 @profile_bp.route('/collections/<int:collection_id>', methods=['DELETE'])
@@ -235,10 +246,16 @@ def delete_item(collection_id, item_id):
 
 @profile_bp.route('/uploads/<path:filename>', methods=['GET'])
 def serve_upload(filename):
-    """Serve static files from the uploads directory."""
     try:
-        upload_folder = os.path.join(os.getcwd(), 'uploads')  # Absolute path to uploads
-        print(f"[DEBUG] Serving file: {filename} from {upload_folder}")
+        upload_folder = os.path.join(os.getcwd(), 'uploads')
+        file_path = os.path.join(upload_folder, filename)
+        print(f"[DEBUG] File request: {filename}, Full path: {file_path}")
+
+        if not os.path.exists(file_path):
+            print(f"[ERROR] File not found at: {file_path}")
+            return jsonify({'error': 'File not found'}), 404
+
+        print(f"[DEBUG] File exists. Serving: {filename}")
         return send_from_directory(upload_folder, filename)
     except Exception as e:
         print(f"[ERROR] Failed to serve file: {filename}. Error: {e}")
