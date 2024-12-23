@@ -132,9 +132,10 @@ def add_item_to_collection(collection_id):
 
             if file:
                 filename = secure_filename(file.filename)
-                file_path = os.path.join('uploads', filename).replace("\\", "/")
+                file_path = filename  # Only store the filename, not the full relative path
+                print(f"[DEBUG] Preparing to save file at: {file_path}")
                 file.save(file_path)
-                print(f"[DEBUG] File saved at: {file_path}")
+                print(f"[DEBUG] File saved at: {os.path.abspath(file_path)}")
             else:
                 file_path = None
         else:
@@ -170,7 +171,6 @@ def add_item_to_collection(collection_id):
         return jsonify({'error': str(e)}), 500
 
 
-
 @profile_bp.route('/collections', methods=['GET'])
 @jwt_required()
 def get_collections():
@@ -199,7 +199,9 @@ def get_collection_items(collection_id):
 
         items_data = []
         for item in items:
-            normalized_file_path = f"http://127.0.0.1:5000/uploads/{item[3]}" if item[3] else None
+            normalized_file_path = (
+                f"http://127.0.0.1:5000/uploads/{item[3]}" if item[3] else None
+            )
             print(f"[DEBUG] Normalizing file path: {item[3]} -> {normalized_file_path}")
 
             items_data.append({
@@ -214,6 +216,7 @@ def get_collection_items(collection_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
+
 
 
 @profile_bp.route('/collections/<int:collection_id>', methods=['DELETE'])

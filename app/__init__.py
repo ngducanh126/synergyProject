@@ -1,4 +1,5 @@
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
@@ -20,11 +21,24 @@ def create_app():
     jwt.init_app(app)
     socketio.init_app(app)
 
+    # Resolve path to the 'uploads' folder (relative to the project root)
+    uploads_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'uploads'))
+
+    @app.route('/uploads/<path:filename>', methods=['GET'])
+    def serve_upload(filename):
+        """Serve files from the uploads directory."""
+        full_path = os.path.join(uploads_folder, filename)
+        print(f"[DEBUG] Serving file from uploads folder: {full_path}")
+        if not os.path.exists(full_path):
+            print(f"[ERROR] File not found: {full_path}")
+            return {"error": "File not found"}, 404
+        return send_from_directory(uploads_folder, filename)
+
     # Import and register Blueprints
     from app.auth_routes import auth_bp
     from app.profile_routes import profile_bp
     from app.match_routes import match_bp
-    from app.chat_routes import chat_bp  # Chat routes for real-time messaging
+    from app.chat_routes import chat_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(profile_bp, url_prefix='/profile')
