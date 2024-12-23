@@ -115,6 +115,38 @@ def add_profile():
     db.session.commit()
     return jsonify({'message': 'Profile created successfully'}), 201
 
+@profile_bp.route('/collections', methods=['POST'])
+@jwt_required()
+def create_collection():
+    user_id = get_jwt_identity()  # Get the current logged-in user's ID
+
+    # Check if the collection name is provided in the request body
+    data = request.get_json()
+    collection_name = data.get('name')
+
+    if not collection_name:
+        return jsonify({'message': 'Collection name is required'}), 400
+
+    try:
+        # Insert the new collection into the collections table
+        query = """
+        INSERT INTO collections (user_id, name)
+        VALUES (:user_id, :name)
+        RETURNING id;
+        """
+        result = db.session.execute(query, {'user_id': user_id, 'name': collection_name})
+        db.session.commit()
+
+        # Get the ID of the newly created collection
+        collection_id = result.fetchone()[0]
+
+        return jsonify({'id': collection_id, 'name': collection_name}), 201
+
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to create collection'}), 500
+
+
 @profile_bp.route('/collections/<int:collection_id>/items', methods=['POST'])
 @jwt_required()
 def add_item_to_collection(collection_id):
