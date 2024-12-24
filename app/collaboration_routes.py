@@ -198,3 +198,149 @@ def view_collaboration(collaboration_id):
         'admin_name': collab[3]
     }
     return jsonify(collaboration_data), 200
+
+
+@collaboration_bp.route('/<int:collaboration_id>/request', methods=['POST'])
+@jwt_required()
+def request_to_join_collaboration(collaboration_id):
+    user_id = get_jwt_identity()
+    try:
+        # Check if the user already sent a request
+        existing_request_query = """
+        SELECT id FROM collaboration_requests
+        WHERE user_id = :user_id AND collaboration_id = :collaboration_id;
+        """
+        existing_request = db.session.execute(
+            existing_request_query, {'user_id': user_id, 'collaboration_id': collaboration_id}
+        ).fetchone()
+
+        if existing_request:
+            return jsonify({'error': 'You have already sent a request to this collaboration.'}), 400
+
+        # Insert the new request
+        insert_query = """
+        INSERT INTO collaboration_requests (user_id, collaboration_id, status)
+        VALUES (:user_id, :collaboration_id, 'pending');
+        """
+        db.session.execute(insert_query, {'user_id': user_id, 'collaboration_id': collaboration_id})
+        db.session.commit()
+
+        return jsonify({'message': 'Request sent successfully.'}), 201
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to send request.'}), 500
+
+@collaboration_bp.route('/my-requests', methods=['GET'])
+@jwt_required()
+def view_my_collab_requests():
+    user_id = get_jwt_identity()
+    try:
+        query = """
+        SELECT cr.id, cr.status, c.name AS collaboration_name, c.description
+        FROM collaboration_requests cr
+        JOIN collaborations c ON cr.collaboration_id = c.id
+        WHERE cr.user_id = :user_id;
+        """
+        requests = db.session.execute(query, {'user_id': user_id}).fetchall()
+
+        requests_data = [
+            {
+                'id': req[0],
+                'status': req[1],
+                'collaboration_name': req[2],
+                'collaboration_description': req[3],
+            }
+            for req in requests
+        ]
+        return jsonify(requests_data), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to fetch collaboration requests.'}), 500
+
+@collaboration_bp.route('/requests/<int:request_id>', methods=['PUT'])
+@jwt_required()
+def handle_collaboration_request(request_id):
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    status = data.get('status')  # 'approved' or 'rejected'
+
+    if status not in ['approved', 'rejected']:
+        return jsonify({'error': 'Invalid status. Use "approved" or "rejected".'}), 400
+
+    try:
+        # Update the request status
+        update_query = """
+        UPDATE collaboration_requests
+        SET status = :status
+        WHERE id = :request_id;
+        """
+        db.session.execute(update_query, {'status': status, 'request_id': request_id})
+        db.session.commit()
+
+        # If approved, add the user to the collaboration
+        if status == 'approved':
+            user_collab_query = """
+            INSERT INTO user_collaborations (user_id, collaboration_id, role)
+            SELECT cr.user_id, cr.collaboration_id, 'member'
+            FROM collaboration_requests cr
+            WHERE cr.id = :request_id;
+            """
+            db.session.execute(user_collab_query, {'request_id': request_id})
+            db.session.commit()
+
+        return jsonify({'message': f'Request has been {status} successfully.'}), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to handle collaboration request.'}), 500
+
+
+
+@collaboration_bp.route('/admin-requests', methods=['GET'])
+@jwt_required()
+def view_pending_requests_for_admin():
+    user_id = get_jwt_identity()
+    try:
+        query = """
+        SELECT cr.id, cr.status, u.username AS requester_name, c.name AS collaboration_name
+        FROM collaboration_requests cr
+        JOIN collaborations c ON cr.collaboration_id = c.id
+        JOIN users u ON cr.user_id = u.id
+        WHERE c.admin_id = :user_id AND cr.status = 'pending';
+        """
+        requests = db.session.execute(query, {'user_id': user_id}).fetchall()
+
+        requests_data = [
+            {
+                'id': req[0],
+                'status': req[1],
+                'requester_name': req[2],
+                'collaboration_name': req[3],
+            }
+            for req in requests
+        ]
+        return jsonify(requests_data), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to fetch pending requests.'}), 500
+
+@collaboration_bp.route('/joined', methods=['GET'])
+@jwt_required()
+def view_collaborations_i_joined():
+    user_id = get_jwt_identity()
+    try:
+        query = """
+        SELECT c.id, c.name, c.description
+        FROM user_collaborations uc
+        JOIN collaborations c ON uc.collaboration_id = c.id
+        WHERE uc.user_id = :user_id AND uc.role = 'member';
+        """
+        collaborations = db.session.execute(query, {'user_id': user_id}).fetchall()
+
+        collaborations_data = [
+            {'id': collab[0], 'name': collab[1], 'description': collab[2]}
+            for collab in collaborations
+        ]
+        return jsonify(collaborations_data), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to fetch joined collaborations.'}), 500
