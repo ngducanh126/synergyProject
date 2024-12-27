@@ -199,23 +199,22 @@ def view_collaboration(collaboration_id):
     }
     return jsonify(collaboration_data), 200
 
-
 @collaboration_bp.route('/<int:collaboration_id>/request', methods=['POST'])
 @jwt_required()
 def request_to_join_collaboration(collaboration_id):
     user_id = get_jwt_identity()
     try:
-        # Check if the user already sent a request
+        # Check if the user has an existing pending request
         existing_request_query = """
         SELECT id FROM collaboration_requests
-        WHERE user_id = :user_id AND collaboration_id = :collaboration_id;
+        WHERE user_id = :user_id AND collaboration_id = :collaboration_id AND status = 'pending';
         """
         existing_request = db.session.execute(
             existing_request_query, {'user_id': user_id, 'collaboration_id': collaboration_id}
         ).fetchone()
 
         if existing_request:
-            return jsonify({'error': 'You have already sent a request to this collaboration.'}), 400
+            return jsonify({'error': 'You already have a pending request to this collaboration.'}), 400
 
         # Insert the new request
         insert_query = """
@@ -229,6 +228,7 @@ def request_to_join_collaboration(collaboration_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to send request.'}), 500
+
 
 @collaboration_bp.route('/my-requests', methods=['GET'])
 @jwt_required()
