@@ -295,3 +295,35 @@ def serve_upload(filename):
     except Exception as e:
         print(f"[ERROR] Failed to serve file: {filename}. Error: {e}")
         return jsonify({'error': 'File not found or inaccessible'}), 404
+
+@profile_bp.route('/<int:user_id>/collections', methods=['OPTIONS', 'GET'])
+@jwt_required()
+def get_collections_by_user(user_id):
+    if request.method == 'OPTIONS':
+        return '', 204  # Return HTTP 204 No Content for preflight
+    # Handle GET request as usual
+    try:
+        print('getting collections for user id = ', user_id)
+        query = "SELECT id, name FROM collections WHERE user_id = :user_id"
+        collections = db.session.execute(query, {'user_id': user_id}).fetchall()
+        collections_data = [{'id': col[0], 'name': col[1]} for col in collections]
+        return jsonify(collections_data), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to fetch collections for the user.'}), 500
+
+
+@profile_bp.route('/collections/<int:collection_id>/ownership', methods=['GET'])
+@jwt_required()
+def check_collection_ownership(collection_id):
+    current_user_id = get_jwt_identity()
+    query = """
+    SELECT user_id FROM collections WHERE id = :collection_id;
+    """
+    owner = db.session.execute(query, {'collection_id': collection_id}).fetchone()
+
+    if not owner:
+        return jsonify({'error': 'Collection not found'}), 404
+
+    is_owner = owner[0] == current_user_id
+    return jsonify({'is_owner': is_owner}), 200

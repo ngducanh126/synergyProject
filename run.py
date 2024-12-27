@@ -5,7 +5,13 @@ from app import create_app, socketio
 app = create_app()
 
 # Configure CORS
-CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}})
+CORS(app, resources={r"/*": {
+    "origins": ["http://localhost:3000", "http://localhost:3001"],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Authorization", "Content-Type"],
+    "supports_credentials": True
+}})
+
 
 if __name__ == '__main__':
     # Run the app with SocketIO
