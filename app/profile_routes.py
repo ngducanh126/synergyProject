@@ -4,6 +4,10 @@ from app import db
 from werkzeug.utils import secure_filename
 import os
 from flask import send_from_directory
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 profile_bp = Blueprint('profile', __name__)
@@ -15,7 +19,7 @@ def view_profile():
 
     # Fetch user details
     query = """
-    SELECT id, username, bio, skills, location, availability, verification_status
+    SELECT id, username, bio, skills, location, availability, verification_status, profile_picture
     FROM users
     WHERE id = :user_id;
     """
@@ -32,8 +36,12 @@ def view_profile():
         'location': user[4],
         'availability': user[5],
         'verification_status': user[6],
+        'profile_picture': user[7],  # Include profile_picture in the response
     }
+    print('retrieved user: ')
+    print(user_data)
     return jsonify(user_data), 200
+
 
 
 @profile_bp.route('/update', methods=['PUT'])
@@ -48,72 +56,63 @@ def update_profile():
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
-    # Update profile data
-    data = request.get_json()
+    # Initialize variables
+    bio = request.form.get('bio')
+    skills = request.form.get('skills')  # Assume this is a comma-separated string
+    location = request.form.get('location')
+    availability = request.form.get('availability')
+    file = request.files.get('profile_picture')
+
+    # Handle profile picture upload
+    profile_picture_path = None
+    if file:
+        try:
+            upload_folder = os.path.join(os.getcwd(), 'uploads', 'profile_picture')
+            os.makedirs(upload_folder, exist_ok=True)  # Ensure the directory exists
+
+            # Generate a secure filename
+            filename = secure_filename(f"user_{user_id}_{file.filename}")
+            file_path = os.path.join(upload_folder, filename)
+            
+            # Save the file to the directory
+            file.save(file_path)
+            profile_picture_path = f"uploads/profile_picture/{filename}"
+        except Exception as e:
+            print(f"[ERROR] Failed to save profile picture: {e}")
+            return jsonify({'message': 'Failed to save profile picture', 'error': str(e)}), 500
+
+    # Convert skills to PostgreSQL array format
+    if skills:
+        skills = "{" + ",".join(skill.strip() for skill in skills.split(',')) + "}"
+
+    # Update profile data in the database
     update_query = """
     UPDATE users
     SET bio = COALESCE(:bio, bio),
         skills = COALESCE(:skills, skills),
         location = COALESCE(:location, location),
-        availability = COALESCE(:availability, availability)
+        availability = COALESCE(:availability, availability),
+        profile_picture = COALESCE(:profile_picture, profile_picture)
     WHERE id = :user_id;
     """
-    db.session.execute(
-        update_query,
-        {
-            'bio': data.get('bio'),
-            'skills': data.get('skills'),
-            'location': data.get('location'),
-            'availability': data.get('availability'),
-            'user_id': user_id,
-        },
-    )
-    db.session.commit()
-    return jsonify({'message': 'Profile updated successfully'}), 200
+    try:
+        db.session.execute(
+            update_query,
+            {
+                'bio': bio,
+                'skills': skills,
+                'location': location,
+                'availability': availability,
+                'profile_picture': profile_picture_path,
+                'user_id': user_id,
+            },
+        )
+        db.session.commit()
+        return jsonify({'message': 'Profile updated successfully'}), 200
+    except Exception as e:
+        print(f"[ERROR] Failed to update profile: {e}")
+        return jsonify({'message': 'Failed to update profile', 'error': str(e)}), 500
 
-
-@profile_bp.route('/add', methods=['POST'])
-@jwt_required()
-def add_profile():
-    user_id = get_jwt_identity()
-
-    # Check if the user exists and already has profile data
-    user_query = """
-    SELECT bio, skills, location, availability
-    FROM users
-    WHERE id = :user_id;
-    """
-    user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
-
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-
-    # Prevent adding profile information if it already exists
-    if user[0] or user[1] or user[2] or user[3]:
-        return jsonify({'message': 'Profile already exists. Use update endpoint to modify it.'}), 400
-
-    # Add new profile data
-    data = request.get_json()
-    insert_query = """
-    UPDATE users
-    SET bio = :bio,
-        skills = :skills,
-        location = :location,
-        availability = :availability
-    WHERE id = :user_id;
-    """
-    db.session.execute(
-        insert_query,
-        {
-            'bio': data.get('bio'),
-            'skills': data.get('skills'),
-            'location': data.get('location'),
-            'availability': data.get('availability'),
-            'user_id': user_id,
-        },
-    )
-    db.session.commit()
-    return jsonify({'message': 'Profile created successfully'}), 201
 
 @profile_bp.route('/collections', methods=['POST'])
 @jwt_required()
