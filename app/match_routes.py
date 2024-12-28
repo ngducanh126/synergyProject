@@ -9,14 +9,27 @@ match_bp = Blueprint('match', __name__)
 @jwt_required()
 def get_other_users():
     current_user_id = get_jwt_identity()
+    collaboration_id = request.args.get('collaboration_id', type=int)  # Optional parameter
 
-    # Fetch other users who are not the current user
-    query = """
-    SELECT id, username, bio, skills, location
-    FROM users
-    WHERE id != :current_user_id;
-    """
-    other_users = db.session.execute(query, {'current_user_id': current_user_id}).fetchall()
+    if collaboration_id:
+        # Fetch other users in the specified collaboration
+        query = """
+        SELECT u.id, u.username, u.bio, u.skills, u.location
+        FROM users u
+        JOIN user_collaborations uc ON u.id = uc.user_id
+        WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
+        """
+        params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
+    else:
+        # Fetch all other users who are not the current user
+        query = """
+        SELECT id, username, bio, skills, location
+        FROM users
+        WHERE id != :current_user_id;
+        """
+        params = {'current_user_id': current_user_id}
+
+    other_users = db.session.execute(query, params).fetchall()
 
     if not other_users:
         return jsonify({'message': 'No other users available'}), 404
@@ -33,6 +46,7 @@ def get_other_users():
     ]
 
     return jsonify(users_data), 200
+
 
 
 # Swipe right on a user

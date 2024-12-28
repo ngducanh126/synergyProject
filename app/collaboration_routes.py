@@ -332,7 +332,7 @@ def view_collaborations_i_joined():
         SELECT c.id, c.name, c.description
         FROM user_collaborations uc
         JOIN collaborations c ON uc.collaboration_id = c.id
-        WHERE uc.user_id = :user_id AND uc.role = 'member';
+        WHERE uc.user_id = :user_id ;
         """
         collaborations = db.session.execute(query, {'user_id': user_id}).fetchall()
 

@@ -311,19 +311,3 @@ def get_collections_by_user(user_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch collections for the user.'}), 500
-
-
-@profile_bp.route('/collections/<int:collection_id>/ownership', methods=['GET'])
-@jwt_required()
-def check_collection_ownership(collection_id):
-    current_user_id = get_jwt_identity()
-    query = """
-    SELECT user_id FROM collections WHERE id = :collection_id;
-    """
-    owner = db.session.execute(query, {'collection_id': collection_id}).fetchone()
-
-    if not owner:
-        return jsonify({'error': 'Collection not found'}), 404
-
-    is_owner = owner[0] == current_user_id
-    return jsonify({'is_owner': is_owner}), 200
