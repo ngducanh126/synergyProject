@@ -18,15 +18,33 @@ def view_profile():
     user_id = get_jwt_identity()
 
     # Fetch user details
-    query = """
+    user_query = """
     SELECT id, username, bio, skills, location, availability, verification_status, profile_picture
     FROM users
     WHERE id = :user_id;
     """
-    user = db.session.execute(query, {'user_id': user_id}).fetchone()
+    user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
 
     if not user:
         return jsonify({'message': 'User not found'}), 404
+
+    # Fetch collaborations where the user is a member or admin
+    collaborations_query = """
+    SELECT c.id, c.name, c.description
+    FROM collaborations c
+    JOIN user_collaborations uc ON c.id = uc.collaboration_id
+    WHERE uc.user_id = :user_id;
+    """
+    collaborations = db.session.execute(collaborations_query, {'user_id': user_id}).fetchall()
+
+    collaborations_data = [
+        {
+            'id': collab[0],
+            'name': collab[1],
+            'description': collab[2],
+        }
+        for collab in collaborations
+    ]
 
     user_data = {
         'id': user[0],
@@ -37,10 +55,13 @@ def view_profile():
         'availability': user[5],
         'verification_status': user[6],
         'profile_picture': user[7],  # Include profile_picture in the response
+        'collaborations': collaborations_data,  # Add collaborations to the response
     }
+
     print('retrieved user: ')
     print(user_data)
     return jsonify(user_data), 200
+
 
 
 
