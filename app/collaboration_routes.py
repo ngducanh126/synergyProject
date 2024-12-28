@@ -236,7 +236,7 @@ def view_my_collab_requests():
     user_id = get_jwt_identity()
     try:
         query = """
-        SELECT cr.id, cr.status, c.name AS collaboration_name, c.description
+        SELECT cr.id, cr.status, c.name AS collaboration_name, c.description, cr.created_at
         FROM collaboration_requests cr
         JOIN collaborations c ON cr.collaboration_id = c.id
         WHERE cr.user_id = :user_id;
@@ -249,6 +249,7 @@ def view_my_collab_requests():
                 'status': req[1],
                 'collaboration_name': req[2],
                 'collaboration_description': req[3],
+                'date': req[4].strftime('%Y-%m-%d %H:%M:%S') if req[4] else None,
             }
             for req in requests
         ]
@@ -256,6 +257,8 @@ def view_my_collab_requests():
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch collaboration requests.'}), 500
+
+
 
 @collaboration_bp.route('/requests/<int:request_id>', methods=['PUT'])
 @jwt_required()
@@ -329,15 +332,20 @@ def view_collaborations_i_joined():
     user_id = get_jwt_identity()
     try:
         query = """
-        SELECT c.id, c.name, c.description
+        SELECT c.id, c.name, c.description, uc.role
         FROM user_collaborations uc
         JOIN collaborations c ON uc.collaboration_id = c.id
-        WHERE uc.user_id = :user_id ;
+        WHERE uc.user_id = :user_id;
         """
         collaborations = db.session.execute(query, {'user_id': user_id}).fetchall()
 
         collaborations_data = [
-            {'id': collab[0], 'name': collab[1], 'description': collab[2]}
+            {
+                'id': collab[0],
+                'name': collab[1],
+                'description': collab[2],
+                'role': collab[3]  # Add the role column
+            }
             for collab in collaborations
         ]
         return jsonify(collaborations_data), 200
