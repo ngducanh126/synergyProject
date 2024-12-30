@@ -17,50 +17,60 @@ profile_bp = Blueprint('profile', __name__)
 def view_profile():
     user_id = get_jwt_identity()
 
-    # Fetch user details
-    user_query = """
-    SELECT id, username, bio, skills, location, availability, verification_status, profile_picture
-    FROM users
-    WHERE id = :user_id;
-    """
-    user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
+    try:
+        # Fetch user details
+        user_query = """
+        SELECT id, username, bio, skills, location, availability, verification_status, profile_picture
+        FROM users
+        WHERE id = :user_id;
+        """
+        user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
 
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
+        if not user:
+            print(f"[DEBUG] User with ID {user_id} not found.")
+            return jsonify({'message': 'User not found'}), 404
 
-    # Fetch collaborations where the user is a member or admin
-    collaborations_query = """
-    SELECT c.id, c.name, c.description
-    FROM collaborations c
-    JOIN user_collaborations uc ON c.id = uc.collaboration_id
-    WHERE uc.user_id = :user_id;
-    """
-    collaborations = db.session.execute(collaborations_query, {'user_id': user_id}).fetchall()
+        print(f"[DEBUG] Retrieved user: ID={user[0]}, Username={user[1]}, Profile Picture={user[7]}")
 
-    collaborations_data = [
-        {
-            'id': collab[0],
-            'name': collab[1],
-            'description': collab[2],
+        # Fetch collaborations where the user is a member or admin
+        collaborations_query = """
+        SELECT c.id, c.name, c.description
+        FROM collaborations c
+        JOIN user_collaborations uc ON c.id = uc.collaboration_id
+        WHERE uc.user_id = :user_id;
+        """
+        collaborations = db.session.execute(collaborations_query, {'user_id': user_id}).fetchall()
+
+        collaborations_data = []
+        for collab in collaborations:
+            print(f"[DEBUG] Collaboration: ID={collab[0]}, Name={collab[1]}, Description={collab[2]}")
+            collaborations_data.append({
+                'id': collab[0],
+                'name': collab[1],
+                'description': collab[2],
+            })
+
+        user_data = {
+            'id': user[0],
+            'username': user[1],
+            'bio': user[2],
+            'skills': user[3],
+            'location': user[4],
+            'availability': user[5],
+            'verification_status': user[6],
+            'profile_picture': user[7],  # Include profile_picture in the response
+            'collaborations': collaborations_data,  # Add collaborations to the response
         }
-        for collab in collaborations
-    ]
 
-    user_data = {
-        'id': user[0],
-        'username': user[1],
-        'bio': user[2],
-        'skills': user[3],
-        'location': user[4],
-        'availability': user[5],
-        'verification_status': user[6],
-        'profile_picture': user[7],  # Include profile_picture in the response
-        'collaborations': collaborations_data,  # Add collaborations to the response
-    }
+        print("[DEBUG] Final user data response:")
+        print(user_data)
 
-    print('retrieved user: ')
-    print(user_data)
-    return jsonify(user_data), 200
+        return jsonify(user_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch profile: {e}")
+        return jsonify({'message': 'Failed to fetch profile'}), 500
+
 
 
 

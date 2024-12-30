@@ -11,41 +11,52 @@ def get_other_users():
     current_user_id = get_jwt_identity()
     collaboration_id = request.args.get('collaboration_id', type=int)  # Optional parameter
 
-    if collaboration_id:
-        # Fetch other users in the specified collaboration
-        query = """
-        SELECT u.id, u.username, u.bio, u.skills, u.location
-        FROM users u
-        JOIN user_collaborations uc ON u.id = uc.user_id
-        WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
-        """
-        params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
-    else:
-        # Fetch all other users who are not the current user
-        query = """
-        SELECT id, username, bio, skills, location
-        FROM users
-        WHERE id != :current_user_id;
-        """
-        params = {'current_user_id': current_user_id}
+    try:
+        if collaboration_id:
+            # Fetch other users in the specified collaboration
+            query = """
+            SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
+            FROM users u
+            JOIN user_collaborations uc ON u.id = uc.user_id
+            WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
+            """
+            params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
+        else:
+            # Fetch all other users who are not the current user
+            query = """
+            SELECT id, username, bio, skills, location, profile_picture
+            FROM users
+            WHERE id != :current_user_id;
+            """
+            params = {'current_user_id': current_user_id}
 
-    other_users = db.session.execute(query, params).fetchall()
+        other_users = db.session.execute(query, params).fetchall()
 
-    if not other_users:
-        return jsonify({'message': 'No other users available'}), 404
+        if not other_users:
+            print(f"[DEBUG] No other users found for user ID {current_user_id}.")
+            return jsonify({'message': 'No other users available'}), 404
 
-    users_data = [
-        {
-            'id': user[0],
-            'username': user[1],
-            'bio': user[2],
-            'skills': user[3],
-            'location': user[4],
-        }
-        for user in other_users
-    ]
+        users_data = []
+        for user in other_users:
+            user_data = {
+                'id': user[0],
+                'username': user[1],
+                'bio': user[2],
+                'skills': user[3],
+                'location': user[4],
+                'profile_picture': user[5],  # Include profile_picture in the response
+            }
+            # Debug: Print the profile picture path for each user
+            print(f"[DEBUG] User ID: {user[0]}, Profile Picture: {user[5]}")
+            users_data.append(user_data)
 
-    return jsonify(users_data), 200
+        print(f"[DEBUG] Retrieved {len(users_data)} other users for user ID {current_user_id}.")
+        return jsonify(users_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch other users: {e}")
+        return jsonify({'message': 'Failed to fetch other users'}), 500
+
 
 
 
