@@ -163,3 +163,113 @@ def get_matches():
     ]
 
     return jsonify(matches_data), 200
+
+
+# Get collaborations of a specific user
+@match_bp.route('/get_user_collaborations/<int:target_user_id>', methods=['GET'])
+@jwt_required()
+def get_user_collaborations(target_user_id):
+    current_user_id = get_jwt_identity()
+
+    try:
+        # Fetch the target user's collaborations
+        query = """
+        SELECT c.id, c.name, c.description
+        FROM collaborations c
+        JOIN user_collaborations uc ON c.id = uc.collaboration_id
+        WHERE uc.user_id = :target_user_id;
+        """
+        collaborations = db.session.execute(query, {'target_user_id': target_user_id}).fetchall()
+
+        if not collaborations:
+            print(f"[DEBUG] No collaborations found for user ID {target_user_id}.")
+            return jsonify({'message': 'No collaborations found.'}), 404
+
+        collaborations_data = [
+            {'id': collab[0], 'name': collab[1], 'description': collab[2]}
+            for collab in collaborations
+        ]
+
+        print(f"[DEBUG] Retrieved {len(collaborations_data)} collaborations for user ID {target_user_id}.")
+        return jsonify({'collaborations': collaborations_data}), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch collaborations for user ID {target_user_id}: {e}")
+        return jsonify({'message': 'Failed to fetch collaborations.'}), 500
+    
+
+@match_bp.route('/get_user/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user(user_id):
+    """
+    Fetch all necessary information about a specific user by their ID.
+    """
+    current_user_id = get_jwt_identity()  # The user making the request
+
+    try:
+        # Fetch user details
+        user_query = """
+        SELECT id, username, bio, skills, location, availability, profile_picture
+        FROM users
+        WHERE id = :user_id;
+        """
+        user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
+
+        if not user:
+            print(f"[DEBUG] User with ID {user_id} not found.")
+            return jsonify({'message': 'User not found'}), 404
+
+        # Debug log for user details
+        print(f"[DEBUG] Retrieved user: ID={user[0]}, Username={user[1]}, Profile Picture={user[6]}")
+
+        # Fetch collaborations where the user is a member or admin
+        collaborations_query = """
+        SELECT c.id, c.name, c.description
+        FROM collaborations c
+        JOIN user_collaborations uc ON c.id = uc.collaboration_id
+        WHERE uc.user_id = :user_id;
+        """
+        collaborations = db.session.execute(collaborations_query, {'user_id': user_id}).fetchall()
+
+        # Structure collaborations data
+        collaborations_data = [
+            {'id': collab[0], 'name': collab[1], 'description': collab[2]}
+            for collab in collaborations
+        ]
+
+        # Fetch collections for the user (if applicable)
+        collections_query = """
+        SELECT id, name
+        FROM collections
+        WHERE user_id = :user_id;
+        """
+        collections = db.session.execute(collections_query, {'user_id': user_id}).fetchall()
+
+        # Structure collections data
+        collections_data = [
+            {'id': collection[0], 'name': collection[1]}
+            for collection in collections
+        ]
+
+        # Combine all user data
+        user_data = {
+            'id': user[0],
+            'username': user[1],
+            'bio': user[2],
+            'skills': user[3],
+            'location': user[4],
+            'availability': user[5],
+            'profile_picture': user[6],
+            'collaborations': collaborations_data,
+            'collections': collections_data,
+        }
+
+        print("[DEBUG] Final user data response:")
+        print(user_data)
+
+        return jsonify(user_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch user details for user ID {user_id}: {e}")
+        return jsonify({'message': 'Failed to fetch user details'}), 500
+
