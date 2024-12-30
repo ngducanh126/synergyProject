@@ -469,3 +469,33 @@ def get_popular_collaborations():
         return jsonify({'error': 'Failed to fetch popular collaborations.'}), 500
 
 
+@collaboration_bp.route('/<int:collaboration_id>/members', methods=['GET'])
+@jwt_required()
+def get_collaboration_members(collaboration_id):
+    try:
+        # Query to fetch users who are part of the collaboration
+        query = """
+        SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture, uc.role
+        FROM user_collaborations uc
+        JOIN users u ON uc.user_id = u.id
+        WHERE uc.collaboration_id = :collaboration_id AND uc.role = 'member' ;
+        """
+        members = db.session.execute(query, {'collaboration_id': collaboration_id}).fetchall()
+
+        members_data = [
+            {
+                'id': member[0],
+                'username': member[1],
+                'bio': member[2],
+                'skills': member[3],
+                'location': member[4],
+                'profile_picture': member[5],
+                'role': member[6],
+            }
+            for member in members
+        ]
+
+        return jsonify({'members': members_data}), 200
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch members for collaboration ID {collaboration_id}: {e}")
+        return jsonify({'error': 'Failed to fetch collaboration members.'}), 500
