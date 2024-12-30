@@ -352,3 +352,37 @@ def view_collaborations_i_joined():
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch joined collaborations.'}), 500
+
+@collaboration_bp.route('/popular', methods=['GET'])
+@jwt_required()
+def get_popular_collaborations():
+    try:
+        user_id = get_jwt_identity()
+        print(f"[DEBUG] User ID: {user_id}")
+
+        # Fetch the top 3 collaborations with the most users
+        query = """
+        SELECT c.id, c.name, c.description, COUNT(uc.user_id) as user_count
+        FROM collaborations c
+        LEFT JOIN user_collaborations uc ON c.id = uc.collaboration_id
+        GROUP BY c.id
+        ORDER BY user_count DESC
+        LIMIT 3;
+        """
+        collaborations = db.session.execute(query).fetchall()
+
+        collaborations_data = [
+            {
+                'id': collab[0],
+                'name': collab[1],
+                'description': collab[2],
+                'user_count': collab[3],
+            }
+            for collab in collaborations
+        ]
+        print(f"[DEBUG] Popular Collaborations: {collaborations_data}")
+        return jsonify(collaborations_data), 200
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return jsonify({'error': 'Failed to fetch popular collaborations.'}), 500
+
