@@ -64,6 +64,7 @@ def create_collaboration():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collaboration'}), 500
 
+# edit a collaboration
 @collaboration_bp.route('/edit/<int:collaboration_id>', methods=['PUT'])
 @jwt_required()
 def edit_collaboration(collaboration_id):
@@ -158,7 +159,7 @@ def view_collaborations():
         return jsonify({'error': 'Failed to fetch collaborations'}), 500
 
 
-# Add photo to a collaboration
+# Add photo to a collaboration (not implemented on front-end yet)
 @collaboration_bp.route('/<int:collaboration_id>/photos', methods=['POST'])
 @jwt_required()
 def add_photo_to_collaboration(collaboration_id):
@@ -197,7 +198,7 @@ def add_photo_to_collaboration(collaboration_id):
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to add photo'}), 500
 
-# View photos in a collaboration
+# View photos in a collaboration  (not implemented on front-end yet)
 @collaboration_bp.route('/<int:collaboration_id>/photos', methods=['GET'])
 @jwt_required()
 def view_collaboration_photos(collaboration_id):
@@ -221,7 +222,8 @@ def view_collaboration_photos(collaboration_id):
         return jsonify({'error': 'Failed to fetch photos'}), 500
 
 
-@collaboration_bp.route('/my', methods=['GET'])
+# getting all collaborations that i am admin of
+@collaboration_bp.route('/collaborations-i-own', methods=['GET'])
 @jwt_required()
 def view_my_collaborations():
     user_id = get_jwt_identity()
@@ -254,6 +256,7 @@ def view_my_collaborations():
         return jsonify({'error': 'Failed to fetch collaborations'}), 500
 
 
+# viewing a collaboration (could be mine or another user's)
 @collaboration_bp.route('/<int:collaboration_id>', methods=['GET'])
 @jwt_required()
 def view_collaboration(collaboration_id):
@@ -277,15 +280,29 @@ def view_collaboration(collaboration_id):
     }
     return jsonify(collaboration_data), 200
 
-
+# request to join
 @collaboration_bp.route('/<int:collaboration_id>/request', methods=['POST'])
 @jwt_required()
 def request_to_join_collaboration(collaboration_id):
     user_id = get_jwt_identity()
     try:
+        # Check if the user is already an admin or a member of the collaboration
+        existing_membership_query = """
+        SELECT 1
+        FROM user_collaborations
+        WHERE user_id = :user_id AND collaboration_id = :collaboration_id;
+        """
+        is_member_or_admin = db.session.execute(
+            existing_membership_query, {'user_id': user_id, 'collaboration_id': collaboration_id}
+        ).fetchone()
+
+        if is_member_or_admin:
+            return jsonify({'error': 'You are already a member or admin of this collaboration.'}), 400
+
         # Check if the user has an existing pending request
         existing_request_query = """
-        SELECT id FROM collaboration_requests
+        SELECT id 
+        FROM collaboration_requests
         WHERE user_id = :user_id AND collaboration_id = :collaboration_id AND status = 'pending';
         """
         existing_request = db.session.execute(
@@ -304,12 +321,13 @@ def request_to_join_collaboration(collaboration_id):
         db.session.commit()
 
         return jsonify({'message': 'Request sent successfully.'}), 201
+
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to send request.'}), 500
 
 
-@collaboration_bp.route('/my-requests', methods=['GET'])
+@collaboration_bp.route('/requests-that-i-sent', methods=['GET'])
 @jwt_required()
 def view_my_collab_requests():
     user_id = get_jwt_identity()
@@ -338,7 +356,7 @@ def view_my_collab_requests():
         return jsonify({'error': 'Failed to fetch collaboration requests.'}), 500
 
 
-
+# accept or reject a request
 @collaboration_bp.route('/requests/<int:request_id>', methods=['PUT'])
 @jwt_required()
 def handle_collaboration_request(request_id):
@@ -377,7 +395,7 @@ def handle_collaboration_request(request_id):
 
 
 
-@collaboration_bp.route('/admin-requests', methods=['GET'])
+@collaboration_bp.route('/view-requests-sent-to-me', methods=['GET'])
 @jwt_required()
 def view_pending_requests_for_admin():
     user_id = get_jwt_identity()
@@ -405,6 +423,7 @@ def view_pending_requests_for_admin():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch pending requests.'}), 500
 
+# view collaborations i joined (i could either be an admin or a member)
 @collaboration_bp.route('/joined', methods=['GET'])
 @jwt_required()
 def view_collaborations_i_joined():

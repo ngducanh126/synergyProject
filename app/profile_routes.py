@@ -18,7 +18,7 @@ def view_profile():
     user_id = get_jwt_identity()
 
     try:
-        # Fetch user details
+        # Fetch current user details
         user_query = """
         SELECT id, username, bio, skills, location, availability, verification_status, profile_picture
         FROM users
@@ -34,20 +34,25 @@ def view_profile():
 
         # Fetch collaborations where the user is a member or admin
         collaborations_query = """
-        SELECT c.id, c.name, c.description
+        SELECT c.id, c.name, c.description, 
+               CASE 
+                   WHEN c.admin_id = :user_id THEN 'admin'
+                   ELSE 'member'
+               END AS role
         FROM collaborations c
-        JOIN user_collaborations uc ON c.id = uc.collaboration_id
-        WHERE uc.user_id = :user_id;
+        LEFT JOIN user_collaborations uc ON c.id = uc.collaboration_id AND uc.user_id = :user_id
+        WHERE c.admin_id = :user_id OR uc.user_id = :user_id;
         """
         collaborations = db.session.execute(collaborations_query, {'user_id': user_id}).fetchall()
 
         collaborations_data = []
         for collab in collaborations:
-            print(f"[DEBUG] Collaboration: ID={collab[0]}, Name={collab[1]}, Description={collab[2]}")
+            print(f"[DEBUG] Collaboration: ID={collab[0]}, Name={collab[1]}, Role={collab[3]}")
             collaborations_data.append({
                 'id': collab[0],
                 'name': collab[1],
                 'description': collab[2],
+                'role': collab[3]  # Add the role field (admin/member)
             })
 
         user_data = {
