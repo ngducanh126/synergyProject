@@ -346,3 +346,58 @@ def get_collections_by_user(user_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch collections for the user.'}), 500
+    
+# Fetch other users' profiles
+@profile_bp.route('/get_others', methods=['GET'])
+@jwt_required()
+def get_other_users():
+    """
+    Fetch all other users except the current user, optionally filtered by collaboration ID.
+    """
+    current_user_id = get_jwt_identity()
+    collaboration_id = request.args.get('collaboration_id', type=int)  # Optional filter
+
+    try:
+        if collaboration_id:
+            # Fetch other users in the specified collaboration
+            query = """
+            SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
+            FROM users u
+            JOIN user_collaborations uc ON u.id = uc.user_id
+            WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
+            """
+            params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
+        else:
+            # Fetch all other users except the current user
+            query = """
+            SELECT id, username, bio, skills, location, profile_picture
+            FROM users
+            WHERE id != :current_user_id;
+            """
+            params = {'current_user_id': current_user_id}
+
+        other_users = db.session.execute(query, params).fetchall()
+
+        if not other_users:
+            print(f"[DEBUG] No other users found for user ID {current_user_id}.")
+            return jsonify({'message': 'No other users available'}), 404
+
+        # Format the response data
+        users_data = [
+            {
+                'id': user[0],
+                'username': user[1],
+                'bio': user[2],
+                'skills': user[3],
+                'location': user[4],
+                'profile_picture': user[5],
+            }
+            for user in other_users
+        ]
+
+        print(f"[DEBUG] Retrieved {len(users_data)} other users for user ID {current_user_id}.")
+        return jsonify(users_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch other users: {e}")
+        return jsonify({'message': 'Failed to fetch other users'}), 500

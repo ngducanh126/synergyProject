@@ -8,47 +8,78 @@ match_bp = Blueprint('match', __name__)
 @match_bp.route('/get_others', methods=['GET'])
 @jwt_required()
 def get_other_users():
+    """
+    Fetch other users for swiping, excluding users the current user has already swiped right on
+    or users they have already matched with (using the matches table).
+    """
     current_user_id = get_jwt_identity()
     collaboration_id = request.args.get('collaboration_id', type=int)  # Optional parameter
 
     try:
+        # Convert current_user_id to integer
+        current_user_id = int(current_user_id)
+
         if collaboration_id:
-            # Fetch other users in the specified collaboration
+            # Fetch users in the specified collaboration excluding swiped-right and matched users
             query = """
             SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
             FROM users u
             JOIN user_collaborations uc ON u.id = uc.user_id
-            WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
+            WHERE uc.collaboration_id = :collaboration_id
+              AND u.id != :current_user_id
+              AND u.id NOT IN (
+                  SELECT unnest(swipe_right) FROM users WHERE id = :current_user_id
+              )
+              AND u.id NOT IN (
+                  SELECT CASE
+                             WHEN user1_id = :current_user_id THEN user2_id
+                             ELSE user1_id
+                         END
+                  FROM matches
+                  WHERE :current_user_id IN (user1_id, user2_id)
+              );
             """
             params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
         else:
-            # Fetch all other users who are not the current user
+            # Fetch all users excluding swiped-right and matched users
             query = """
-            SELECT id, username, bio, skills, location, profile_picture
-            FROM users
-            WHERE id != :current_user_id;
+            SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
+            FROM users u
+            WHERE u.id != :current_user_id
+              AND u.id NOT IN (
+                  SELECT unnest(swipe_right) FROM users WHERE id = :current_user_id
+              )
+              AND u.id NOT IN (
+                  SELECT CASE
+                             WHEN user1_id = :current_user_id THEN user2_id
+                             ELSE user1_id
+                         END
+                  FROM matches
+                  WHERE :current_user_id IN (user1_id, user2_id)
+              );
             """
             params = {'current_user_id': current_user_id}
 
+        # Execute the query
         other_users = db.session.execute(query, params).fetchall()
 
+        # Handle no users found
         if not other_users:
             print(f"[DEBUG] No other users found for user ID {current_user_id}.")
             return jsonify({'message': 'No other users available'}), 404
 
-        users_data = []
-        for user in other_users:
-            user_data = {
+        # Prepare response data
+        users_data = [
+            {
                 'id': user[0],
                 'username': user[1],
                 'bio': user[2],
                 'skills': user[3],
                 'location': user[4],
-                'profile_picture': user[5],  # Include profile_picture in the response
+                'profile_picture': user[5],
             }
-            # Debug: Print the profile picture path for each user
-            print(f"[DEBUG] User ID: {user[0]}, Profile Picture: {user[5]}")
-            users_data.append(user_data)
+            for user in other_users
+        ]
 
         print(f"[DEBUG] Retrieved {len(users_data)} other users for user ID {current_user_id}.")
         return jsonify(users_data), 200
@@ -57,112 +88,137 @@ def get_other_users():
         print(f"[ERROR] Failed to fetch other users: {e}")
         return jsonify({'message': 'Failed to fetch other users'}), 500
 
-
-
-
-# Swipe right on a user
 @match_bp.route('/swipe_right/<int:target_user_id>', methods=['POST'])
 @jwt_required()
 def swipe_right(target_user_id):
+    """
+    Handle the logic for swiping right on a user.
+    Check for a mutual match and update the matches table if there's a match.
+    """
     current_user_id = get_jwt_identity()
 
-    # Check if the target user exists
-    target_user_query = "SELECT id, swipe_right FROM users WHERE id = :target_user_id;"
-    target_user = db.session.execute(target_user_query, {'target_user_id': target_user_id}).fetchone()
+    try:
+        # Convert current_user_id to integer
+        current_user_id = int(current_user_id)
 
-    if not target_user:
-        return jsonify({'message': 'Target user not found'}), 404
+        # Fetch swipe_right list for the current user
+        current_user_query = "SELECT swipe_right FROM users WHERE id = :current_user_id;"
+        current_user = db.session.execute(current_user_query, {'current_user_id': current_user_id}).fetchone()
 
-    # Fetch and update current user's swipe_right
-    current_user_query = "SELECT swipe_right FROM users WHERE id = :current_user_id;"
-    current_user = db.session.execute(current_user_query, {'current_user_id': current_user_id}).fetchone()
+        # Ensure the current user exists
+        if not current_user:
+            return jsonify({'message': 'Current user not found'}), 404
 
-    swipe_right_list = current_user[0] if current_user and current_user[0] else []
-    if target_user_id in swipe_right_list:
-        return jsonify({'message': 'Already swiped right'}), 400
+        current_swipe_right = current_user[0] if current_user[0] else []
 
-    swipe_right_list.append(target_user_id)
-    update_swipe_query = "UPDATE users SET swipe_right = :swipe_right WHERE id = :current_user_id;"
-    db.session.execute(update_swipe_query, {'swipe_right': swipe_right_list, 'current_user_id': current_user_id})
+        # Ensure the target user exists
+        target_user_query = "SELECT swipe_right FROM users WHERE id = :target_user_id;"
+        target_user = db.session.execute(target_user_query, {'target_user_id': target_user_id}).fetchone()
 
-    # Check for mutual match
-    is_match = False
-    if current_user_id in (target_user[1] if target_user[1] else []):
-        # Fetch matches for both users
-        fetch_matches_query = "SELECT matches FROM users WHERE id = :user_id;"
-        current_user_matches = db.session.execute(fetch_matches_query, {'user_id': current_user_id}).fetchone()
-        target_user_matches = db.session.execute(fetch_matches_query, {'user_id': target_user_id}).fetchone()
+        if not target_user:
+            return jsonify({'message': 'Target user not found'}), 404
 
-        current_user_matches = current_user_matches[0] if current_user_matches and current_user_matches[0] else []
-        target_user_matches = target_user_matches[0] if target_user_matches and target_user_matches[0] else []
+        target_swipe_right = target_user[0] if target_user[0] else []
+        target_swipe_right = [int(user_id) for user_id in target_swipe_right]
 
-        current_user_matches.append(target_user_id)
-        target_user_matches.append(current_user_id)
+        # Debugging: Print types and values
+        print(f"[DEBUG] current_user_id: {current_user_id}, type: {type(current_user_id)}")
+        print(f"[DEBUG] target_swipe_right: {target_swipe_right}, type: {type(target_swipe_right)}")
+        print(f"[DEBUG] Current user swipe_right: {current_swipe_right}")
 
-        update_matches_query = "UPDATE users SET matches = :matches WHERE id = :user_id;"
-        db.session.execute(update_matches_query, {'matches': current_user_matches, 'user_id': current_user_id})
-        db.session.execute(update_matches_query, {'matches': target_user_matches, 'user_id': target_user_id})
+        # Prevent duplicate swipes
+        if target_user_id in current_swipe_right:
+            return jsonify({'message': 'Already swiped right'}), 400
 
-        is_match = True
+        # Add the target user to the current user's swipe_right list
+        current_swipe_right.append(target_user_id)
+        db.session.execute(
+            "UPDATE users SET swipe_right = :swipe_right WHERE id = :current_user_id;",
+            {'swipe_right': current_swipe_right, 'current_user_id': current_user_id}
+        )
 
-    db.session.commit()
+        # Check for mutual match
+        if current_user_id in target_swipe_right:
+            print('yes match')
+            # Add to the matches table
+            db.session.execute(
+                """
+                INSERT INTO matches (user1_id, user2_id, matched_at)
+                VALUES (:user1_id, :user2_id, NOW())
+                ON CONFLICT DO NOTHING;
+                """,
+                {'user1_id': min(current_user_id, target_user_id),
+                 'user2_id': max(current_user_id, target_user_id)}
+            )
 
-    if is_match:
-        return jsonify({'message': 'Swiped right successfully! It\'s a match!', 'is_match': True}), 200
+            print(f"[DEBUG] Match found: User {current_user_id} and User {target_user_id}")
+            db.session.commit()
 
-    return jsonify({'message': 'Swiped right successfully', 'is_match': False}), 200
+            return jsonify({'message': 'Swiped right successfully! It\'s a match!', 'is_match': True}), 200
+
+        # Commit the swipe action
+        db.session.commit()
+
+        return jsonify({'message': 'Swiped right successfully', 'is_match': False}), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to process swipe right for user {current_user_id} on user {target_user_id}: {e}")
+        return jsonify({'message': 'Failed to process swipe right'}), 500
 
 
-# Get Matches
+
 @match_bp.route('/matches', methods=['GET'])
 @jwt_required()
 def get_matches():
+    """
+    Fetch all users who are mutual matches with the current user using the matches table.
+    """
     current_user_id = get_jwt_identity()
 
-    # Fetch current user's swipe_right list
-    current_user_query = "SELECT swipe_right FROM users WHERE id = :current_user_id;"
-    current_user = db.session.execute(current_user_query, {'current_user_id': current_user_id}).fetchone()
+    try:
+        # Convert current_user_id to integer
+        current_user_id = int(current_user_id)
 
-    if not current_user or not current_user[0]:
-        return jsonify({'message': 'No matches yet!'}), 404
+        # Fetch mutual matches from the matches table
+        matches_query = """
+        SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
+        FROM users u
+        JOIN matches m ON u.id = m.user2_id
+        WHERE m.user1_id = :current_user_id
+        UNION
+        SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
+        FROM users u
+        JOIN matches m ON u.id = m.user1_id
+        WHERE m.user2_id = :current_user_id;
+        """
+        matches = db.session.execute(matches_query, {'current_user_id': current_user_id}).fetchall()
 
-    # List of users the current user has liked
-    liked_users = current_user[0]
+        # Handle no matches found
+        if not matches:
+            print(f"[DEBUG] No matches found for user ID {current_user_id}.")
+            return jsonify({'message': 'No matches yet!'}), 404
 
-    # Check if those users have also liked the current user
-    mutual_matches = []
-    for liked_user_id in liked_users:
-        liked_user_query = "SELECT swipe_right FROM users WHERE id = :liked_user_id;"
-        liked_user = db.session.execute(liked_user_query, {'liked_user_id': liked_user_id}).fetchone()
+        # Structure matched users' data
+        matches_data = [
+            {
+                'id': user[0],
+                'username': user[1],
+                'bio': user[2],
+                'skills': user[3],
+                'location': user[4],
+                'profile_picture': user[5],
+            }
+            for user in matches
+        ]
 
-        if liked_user and liked_user[0]:
-            # Check for mutual match
-            if int(current_user_id) in [int(id) for id in liked_user[0]]:
-                mutual_matches.append(liked_user_id)
+        print(f"[DEBUG] Retrieved {len(matches_data)} matches for user ID {current_user_id}.")
+        return jsonify(matches_data), 200
 
-    if not mutual_matches:
-        return jsonify({'message': 'No matches yet!'}), 404
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch matches for user ID {current_user_id}: {e}")
+        return jsonify({'message': 'Failed to fetch matches.'}), 500
 
-    # Fetch matched users' profiles
-    matches_query = """
-    SELECT id, username, bio, skills, location
-    FROM users
-    WHERE id = ANY(:mutual_matches);
-    """
-    matches = db.session.execute(matches_query, {'mutual_matches': mutual_matches}).fetchall()
 
-    matches_data = [
-        {
-            'id': user[0],
-            'username': user[1],
-            'bio': user[2],
-            'skills': user[3],
-            'location': user[4],
-        }
-        for user in matches
-    ]
-
-    return jsonify(matches_data), 200
 
 
 # Get collaborations of a specific user
@@ -273,3 +329,44 @@ def get_user(user_id):
         print(f"[ERROR] Failed to fetch user details for user ID {user_id}: {e}")
         return jsonify({'message': 'Failed to fetch user details'}), 500
 
+
+@match_bp.route('/likes', methods=['GET'])
+@jwt_required()
+def likes():
+    """
+    Get all users who swiped right on the logged-in user.
+    """
+    current_user_id = get_jwt_identity()  # The ID of the logged-in user
+
+    try:
+        # Fetch users who have the current user ID in their swipe_right array
+        query = """
+        SELECT id, username, bio, skills, location, profile_picture
+        FROM users
+        WHERE :current_user_id = ANY(swipe_right);
+        """
+        liked_users = db.session.execute(query, {'current_user_id': current_user_id}).fetchall()
+
+        if not liked_users:
+            print(f"[DEBUG] No users found who liked user ID {current_user_id}.")
+            return jsonify({'message': 'No users have liked you yet.'}), 404
+
+        # Structure liked users' data
+        liked_users_data = [
+            {
+                'id': user[0],
+                'username': user[1],
+                'bio': user[2],
+                'skills': user[3],
+                'location': user[4],
+                'profile_picture': user[5],
+            }
+            for user in liked_users
+        ]
+
+        print(f"[DEBUG] Retrieved {len(liked_users_data)} users who liked user ID {current_user_id}.")
+        return jsonify(liked_users_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch users who liked user ID {current_user_id}: {e}")
+        return jsonify({'message': 'Failed to fetch users who liked you.'}), 500
