@@ -166,7 +166,6 @@ def swipe_right(target_user_id):
         return jsonify({'message': 'Failed to process swipe right'}), 500
 
 
-
 @match_bp.route('/matches', methods=['GET'])
 @jwt_required()
 def get_matches():
@@ -193,11 +192,6 @@ def get_matches():
         """
         matches = db.session.execute(matches_query, {'current_user_id': current_user_id}).fetchall()
 
-        # Handle no matches found
-        if not matches:
-            print(f"[DEBUG] No matches found for user ID {current_user_id}.")
-            return jsonify({'message': 'No matches yet!'}), 404
-
         # Structure matched users' data
         matches_data = [
             {
@@ -218,9 +212,6 @@ def get_matches():
         print(f"[ERROR] Failed to fetch matches for user ID {current_user_id}: {e}")
         return jsonify({'message': 'Failed to fetch matches.'}), 500
 
-
-
-
 # Get collaborations of a specific user
 @match_bp.route('/get_user_collaborations/<int:target_user_id>', methods=['GET'])
 @jwt_required()
@@ -237,9 +228,10 @@ def get_user_collaborations(target_user_id):
         """
         collaborations = db.session.execute(query, {'target_user_id': target_user_id}).fetchall()
 
+        # Handle no collaborations case
         if not collaborations:
             print(f"[DEBUG] No collaborations found for user ID {target_user_id}.")
-            return jsonify({'message': 'No collaborations found.'}), 404
+            return jsonify({'collaborations': []}), 200
 
         collaborations_data = [
             {'id': collab[0], 'name': collab[1], 'description': collab[2]}
@@ -252,6 +244,7 @@ def get_user_collaborations(target_user_id):
     except Exception as e:
         print(f"[ERROR] Failed to fetch collaborations for user ID {target_user_id}: {e}")
         return jsonify({'message': 'Failed to fetch collaborations.'}), 500
+
     
 
 @match_bp.route('/get_user/<int:user_id>', methods=['GET'])
