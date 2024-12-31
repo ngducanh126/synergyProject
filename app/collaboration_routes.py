@@ -12,6 +12,20 @@ collaboration_bp = Blueprint('collaboration', __name__)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+from flask import Blueprint, jsonify, request, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from werkzeug.utils import secure_filename
+import os
+from app import db
+
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+collaboration_bp = Blueprint('collaboration', __name__)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # Create a collaboration
 @collaboration_bp.route('/create', methods=['POST'])
 @jwt_required()
@@ -40,13 +54,16 @@ def create_collaboration():
 
         profile_picture_path = None
         if file and allowed_file(file.filename):
+            # Extract the file extension
+            file_extension = file.filename.rsplit('.', 1)[1].lower()
+            
             # Create the collaboration-specific directory
             collaboration_folder = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id))
             os.makedirs(collaboration_folder, exist_ok=True)
 
-            # Save the file as profile_picture.jpg
-            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.jpg"
-            full_path = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id), "profile_picture.jpg")
+            # Save the file as profile_picture.<extension>
+            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.{file_extension}"
+            full_path = os.path.join(collaboration_folder, f"profile_picture.{file_extension}")
             file.save(full_path)
 
             # Update the profile picture path in the database (save relative path)
@@ -97,13 +114,16 @@ def edit_collaboration(collaboration_id):
             update_values['description'] = description
 
         if profile_picture and allowed_file(profile_picture.filename):
+            # Extract the file extension
+            file_extension = profile_picture.filename.rsplit('.', 1)[1].lower()
+            
             # Create the collaboration-specific directory if it doesn't exist
             collaboration_folder = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id))
             os.makedirs(collaboration_folder, exist_ok=True)
 
-            # Save the file as profile_picture.jpg
-            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.jpg"
-            full_path = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id), "profile_picture.jpg")
+            # Save the file as profile_picture.<extension>
+            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.{file_extension}"
+            full_path = os.path.join(collaboration_folder, f"profile_picture.{file_extension}")
 
             print(f"[DEBUG] Saving profile picture to: {full_path}")
             profile_picture.save(full_path)
@@ -125,6 +145,7 @@ def edit_collaboration(collaboration_id):
     except Exception as e:
         print(f"[ERROR] Failed to update collaboration: {e}")
         return jsonify({'error': 'Failed to update collaboration.'}), 500
+
 
 
 # View all collaborations
