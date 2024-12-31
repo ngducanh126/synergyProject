@@ -334,19 +334,28 @@ def get_user(user_id):
 @jwt_required()
 def likes():
     """
-    Get all users who swiped right on the logged-in user.
+    Get all users who swiped right on the logged-in user, excluding users they have already matched with.
     """
     current_user_id = get_jwt_identity()  # The ID of the logged-in user
 
     try:
-        # Fetch users who have the current user ID in their swipe_right array
+        # Fetch users who liked the current user but are not mutual matches
         query = """
         SELECT id, username, bio, skills, location, profile_picture
         FROM users
-        WHERE :current_user_id = ANY(swipe_right);
+        WHERE :current_user_id = ANY(swipe_right)
+          AND id NOT IN (
+              SELECT CASE
+                         WHEN user1_id = :current_user_id THEN user2_id
+                         ELSE user1_id
+                     END
+              FROM matches
+              WHERE :current_user_id IN (user1_id, user2_id)
+          );
         """
         liked_users = db.session.execute(query, {'current_user_id': current_user_id}).fetchall()
 
+        # Handle case where no users are found
         if not liked_users:
             print(f"[DEBUG] No users found who liked user ID {current_user_id}.")
             return jsonify({'message': 'No users have liked you yet.'}), 404
