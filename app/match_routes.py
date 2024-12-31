@@ -258,7 +258,8 @@ def get_user_collaborations(target_user_id):
 @jwt_required()
 def get_user(user_id):
     """
-    Fetch all necessary information about a specific user by their ID.
+    Fetch all necessary information about a specific user by their ID,
+    including whether the current user has already swiped right on them.
     """
     current_user_id = get_jwt_identity()  # The user making the request
 
@@ -277,6 +278,17 @@ def get_user(user_id):
 
         # Debug log for user details
         print(f"[DEBUG] Retrieved user: ID={user[0]}, Username={user[1]}, Profile Picture={user[6]}")
+
+        # Check if the current user has already swiped right on the target user
+        swipe_check_query = """
+        SELECT :user_id = ANY(swipe_right)
+        FROM users
+        WHERE id = :current_user_id;
+        """
+        already_swiped = db.session.execute(swipe_check_query, {
+            'user_id': user_id,
+            'current_user_id': current_user_id,
+        }).scalar()
 
         # Fetch collaborations where the user is a member or admin
         collaborations_query = """
@@ -318,6 +330,7 @@ def get_user(user_id):
             'profile_picture': user[6],
             'collaborations': collaborations_data,
             'collections': collections_data,
+            'already_swiped_right': already_swiped,  # Add swipe right status
         }
 
         print("[DEBUG] Final user data response:")
@@ -328,6 +341,7 @@ def get_user(user_id):
     except Exception as e:
         print(f"[ERROR] Failed to fetch user details for user ID {user_id}: {e}")
         return jsonify({'message': 'Failed to fetch user details'}), 500
+
 
 
 @match_bp.route('/likes', methods=['GET'])
