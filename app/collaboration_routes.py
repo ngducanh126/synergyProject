@@ -5,11 +5,7 @@ import os
 from app import db
 
 
-UPLOAD_FOLDER = 'uploads/collab_profile_picture'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-# Ensure the folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 collaboration_bp = Blueprint('collaboration', __name__)
 
@@ -28,28 +24,39 @@ def create_collaboration():
     if not name:
         return jsonify({'error': 'Collaboration name is required'}), 400
 
-    profile_picture_path = None
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        # Save the file to the upload folder
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-        # Use forward slashes for the file path
-        profile_picture_path = f"{UPLOAD_FOLDER}/{filename}".replace("\\", "/")
-
     try:
-        # Insert the collaboration into the database
+        # Insert the collaboration into the database first to get the ID
         query = """
         INSERT INTO collaborations (admin_id, name, description, profile_picture)
-        VALUES (:admin_id, :name, :description, :profile_picture)
+        VALUES (:admin_id, :name, :description, NULL)
         RETURNING id;
         """
         result = db.session.execute(query, {
             'admin_id': user_id,
             'name': name,
-            'description': description,
-            'profile_picture': profile_picture_path  # Include the file path
+            'description': description
         })
         collaboration_id = result.fetchone()[0]
+
+        profile_picture_path = None
+        if file and allowed_file(file.filename):
+            # Create the collaboration-specific directory
+            collaboration_folder = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id))
+            os.makedirs(collaboration_folder, exist_ok=True)
+
+            # Save the file as profile_picture.jpg
+            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.jpg"
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id), "profile_picture.jpg")
+            file.save(full_path)
+
+            # Update the profile picture path in the database (save relative path)
+            update_query = """
+            UPDATE collaborations
+            SET profile_picture = :profile_picture
+            WHERE id = :collaboration_id;
+            """
+            db.session.execute(update_query, {'profile_picture': relative_path, 'collaboration_id': collaboration_id})
+            db.session.commit()
 
         # Add the creator as an admin to the user_collaborations table
         user_collab_query = """
@@ -64,7 +71,8 @@ def create_collaboration():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collaboration'}), 500
 
-# edit a collaboration
+
+# Edit a collaboration
 @collaboration_bp.route('/edit/<int:collaboration_id>', methods=['PUT'])
 @jwt_required()
 def edit_collaboration(collaboration_id):
@@ -75,8 +83,6 @@ def edit_collaboration(collaboration_id):
     profile_picture = request.files.get('profile_picture')  # Optional file upload
 
     print(f"[DEBUG] Received edit request for Collaboration ID: {collaboration_id} by User ID: {user_id}")
-    print(f"[DEBUG] Data received - Name: {name}, Description: {description}, Profile Picture: {profile_picture}")
-
     try:
         # Prepare the fields to update
         update_fields = []
@@ -85,38 +91,37 @@ def edit_collaboration(collaboration_id):
         if name:
             update_fields.append("name = :name")
             update_values['name'] = name
-            print(f"[DEBUG] Name update queued: {name}")
 
         if description:
             update_fields.append("description = :description")
             update_values['description'] = description
-            print(f"[DEBUG] Description update queued: {description}")
 
-        # Handle profile picture upload
-        if profile_picture:
-            upload_folder = "uploads/collab_profile_picture/"
-            os.makedirs(upload_folder, exist_ok=True)
-            profile_picture_path = os.path.join(upload_folder, profile_picture.filename).replace("\\", "/")
-            profile_picture.save(profile_picture_path)
+        if profile_picture and allowed_file(profile_picture.filename):
+            # Create the collaboration-specific directory if it doesn't exist
+            collaboration_folder = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id))
+            os.makedirs(collaboration_folder, exist_ok=True)
+
+            # Save the file as profile_picture.jpg
+            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.jpg"
+            full_path = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id), "profile_picture.jpg")
+
+            print(f"[DEBUG] Saving profile picture to: {full_path}")
+            profile_picture.save(full_path)
+
             update_fields.append("profile_picture = :profile_picture")
-            update_values['profile_picture'] = profile_picture_path
-            print(f"[DEBUG] Profile picture saved at: {profile_picture_path}")
+            update_values['profile_picture'] = relative_path
 
-        # Update the collaboration
+        # Update the collaboration in the database
         if update_fields:
             update_query = f"""
             UPDATE collaborations
             SET {", ".join(update_fields)}
             WHERE id = :collaboration_id;
             """
-            print(f"[DEBUG] Update Query: {update_query}")
-            print(f"[DEBUG] Update Values: {update_values}")
             db.session.execute(update_query, update_values)
             db.session.commit()
-            print(f"[DEBUG] Collaboration ID {collaboration_id} updated successfully.")
 
         return jsonify({'message': 'Collaboration updated successfully.'}), 200
-
     except Exception as e:
         print(f"[ERROR] Failed to update collaboration: {e}")
         return jsonify({'error': 'Failed to update collaboration.'}), 500
@@ -159,7 +164,7 @@ def view_collaborations():
         return jsonify({'error': 'Failed to fetch collaborations'}), 500
 
 
-# Add photo to a collaboration (not implemented on front-end yet)
+# Add photo to a collaboration (not implemented on front-end yet)  ; need to make storage logic better
 @collaboration_bp.route('/<int:collaboration_id>/photos', methods=['POST'])
 @jwt_required()
 def add_photo_to_collaboration(collaboration_id):
@@ -198,7 +203,7 @@ def add_photo_to_collaboration(collaboration_id):
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to add photo'}), 500
 
-# View photos in a collaboration  (not implemented on front-end yet)
+# View photos in a collaboration  (not implemented on front-end yet)  ; need to make storage logic better
 @collaboration_bp.route('/<int:collaboration_id>/photos', methods=['GET'])
 @jwt_required()
 def view_collaboration_photos(collaboration_id):
