@@ -12,6 +12,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 profile_bp = Blueprint('profile', __name__)
 
+
+# view my profile
 @profile_bp.route('/view', methods=['GET'])
 @jwt_required()
 def view_profile():
@@ -77,9 +79,7 @@ def view_profile():
         return jsonify({'message': 'Failed to fetch profile'}), 500
 
 
-
-
-
+# update my profile
 @profile_bp.route('/update', methods=['PUT'])
 @jwt_required()
 def update_profile():
@@ -150,6 +150,63 @@ def update_profile():
         return jsonify({'message': 'Failed to update profile', 'error': str(e)}), 500
 
 
+# Fetch other users' profiles
+@profile_bp.route('/get_others', methods=['GET'])
+@jwt_required()
+def get_other_users():
+    """
+    Fetch all other users except the current user, optionally filtered by collaboration ID.
+    """
+    current_user_id = get_jwt_identity()
+    collaboration_id = request.args.get('collaboration_id', type=int)  # Optional filter
+
+    try:
+        if collaboration_id:
+            # Fetch other users in the specified collaboration
+            query = """
+            SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
+            FROM users u
+            JOIN user_collaborations uc ON u.id = uc.user_id
+            WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
+            """
+            params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
+        else:
+            # Fetch all other users except the current user
+            query = """
+            SELECT id, username, bio, skills, location, profile_picture
+            FROM users
+            WHERE id != :current_user_id;
+            """
+            params = {'current_user_id': current_user_id}
+
+        other_users = db.session.execute(query, params).fetchall()
+
+        if not other_users:
+            print(f"[DEBUG] No other users found for user ID {current_user_id}.")
+            return jsonify({'message': 'No other users available'}), 404
+
+        # Format the response data
+        users_data = [
+            {
+                'id': user[0],
+                'username': user[1],
+                'bio': user[2],
+                'skills': user[3],
+                'location': user[4],
+                'profile_picture': user[5],
+            }
+            for user in other_users
+        ]
+
+        print(f"[DEBUG] Retrieved {len(users_data)} other users for user ID {current_user_id}.")
+        return jsonify(users_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch other users: {e}")
+        return jsonify({'message': 'Failed to fetch other users'}), 500
+    
+
+# create a collection for current user ( name, descriotion, profile picture for collection)
 @profile_bp.route('/collections', methods=['POST'])
 @jwt_required()
 def create_collection():
@@ -181,6 +238,7 @@ def create_collection():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collection'}), 500
 
+# POST an item to one of my collection
 @profile_bp.route('/collections/<int:collection_id>/items', methods=['POST'])
 @jwt_required()
 def add_item_to_collection(collection_id):
@@ -237,8 +295,7 @@ def add_item_to_collection(collection_id):
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
 
-
-
+# getting my collections
 @profile_bp.route('/collections', methods=['GET'])
 @jwt_required()
 def get_collections():
@@ -252,6 +309,7 @@ def get_collections():
     print(f"[DEBUG] Retrieved collections: {collections_data}")
     return jsonify(collections_data), 200
 
+# getting collections for another user
 @profile_bp.route('/collections/<int:collection_id>', methods=['GET'])
 @jwt_required()
 def get_collection_items(collection_id):
@@ -287,10 +345,7 @@ def get_collection_items(collection_id):
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
 
-
-
-
-
+# delete one of my collections
 @profile_bp.route('/collections/<int:collection_id>', methods=['DELETE'])
 @jwt_required()
 def delete_collection(collection_id):
@@ -304,6 +359,7 @@ def delete_collection(collection_id):
     return jsonify({'message': 'Collection deleted successfully'}), 200
 
 
+# delete an item from one of my collection
 @profile_bp.route('/collections/<int:collection_id>/items/<int:item_id>', methods=['DELETE'])
 @jwt_required()
 def delete_item(collection_id, item_id):
@@ -336,6 +392,7 @@ def serve_upload(filename):
         print(f"[ERROR] Failed to serve file: {filename}. Error: {e}")
         return jsonify({'error': 'File not found or inaccessible'}), 404
 
+# getting collections for another user
 @profile_bp.route('/<int:user_id>/collections', methods=['OPTIONS', 'GET'])
 @jwt_required()
 def get_collections_by_user(user_id):
@@ -352,57 +409,3 @@ def get_collections_by_user(user_id):
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch collections for the user.'}), 500
     
-# Fetch other users' profiles
-@profile_bp.route('/get_others', methods=['GET'])
-@jwt_required()
-def get_other_users():
-    """
-    Fetch all other users except the current user, optionally filtered by collaboration ID.
-    """
-    current_user_id = get_jwt_identity()
-    collaboration_id = request.args.get('collaboration_id', type=int)  # Optional filter
-
-    try:
-        if collaboration_id:
-            # Fetch other users in the specified collaboration
-            query = """
-            SELECT u.id, u.username, u.bio, u.skills, u.location, u.profile_picture
-            FROM users u
-            JOIN user_collaborations uc ON u.id = uc.user_id
-            WHERE uc.collaboration_id = :collaboration_id AND u.id != :current_user_id;
-            """
-            params = {'collaboration_id': collaboration_id, 'current_user_id': current_user_id}
-        else:
-            # Fetch all other users except the current user
-            query = """
-            SELECT id, username, bio, skills, location, profile_picture
-            FROM users
-            WHERE id != :current_user_id;
-            """
-            params = {'current_user_id': current_user_id}
-
-        other_users = db.session.execute(query, params).fetchall()
-
-        if not other_users:
-            print(f"[DEBUG] No other users found for user ID {current_user_id}.")
-            return jsonify({'message': 'No other users available'}), 404
-
-        # Format the response data
-        users_data = [
-            {
-                'id': user[0],
-                'username': user[1],
-                'bio': user[2],
-                'skills': user[3],
-                'location': user[4],
-                'profile_picture': user[5],
-            }
-            for user in other_users
-        ]
-
-        print(f"[DEBUG] Retrieved {len(users_data)} other users for user ID {current_user_id}.")
-        return jsonify(users_data), 200
-
-    except Exception as e:
-        print(f"[ERROR] Failed to fetch other users: {e}")
-        return jsonify({'message': 'Failed to fetch other users'}), 500

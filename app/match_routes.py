@@ -88,6 +88,7 @@ def get_other_users():
         print(f"[ERROR] Failed to fetch other users: {e}")
         return jsonify({'message': 'Failed to fetch other users'}), 500
 
+# like (or "swipe right") a user
 @match_bp.route('/swipe_right/<int:target_user_id>', methods=['POST'])
 @jwt_required()
 def swipe_right(target_user_id):
@@ -211,6 +212,7 @@ def get_matches():
     except Exception as e:
         print(f"[ERROR] Failed to fetch matches for user ID {current_user_id}: {e}")
         return jsonify({'message': 'Failed to fetch matches.'}), 500
+
 
 # Get collaborations of a specific user
 @match_bp.route('/get_user_collaborations/<int:target_user_id>', methods=['GET'])
