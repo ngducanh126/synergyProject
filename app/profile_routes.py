@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from werkzeug.utils import secure_filename
@@ -6,11 +6,12 @@ import os
 from flask import send_from_directory
 from werkzeug.utils import secure_filename
 
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
 profile_bp = Blueprint('profile', __name__)
+
+# Define allowed extensions
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 # view my profile
@@ -79,7 +80,7 @@ def view_profile():
         return jsonify({'message': 'Failed to fetch profile'}), 500
 
 
-# update my profile
+# Update my profile
 @profile_bp.route('/update', methods=['PUT'])
 @jwt_required()
 def update_profile():
@@ -101,18 +102,24 @@ def update_profile():
 
     # Handle profile picture upload
     profile_picture_path = None
-    if file:
+    if file and allowed_file(file.filename):
         try:
-            upload_folder = os.path.join(os.getcwd(), 'uploads', 'profile_picture')
-            os.makedirs(upload_folder, exist_ok=True)  # Ensure the directory exists
+            # Extract file extension
+            file_extension = file.filename.rsplit('.', 1)[1].lower()
 
-            # Generate a secure filename
-            filename = secure_filename(f"user_{user_id}_{file.filename}")
-            file_path = os.path.join(upload_folder, filename)
-            
-            # Save the file to the directory
-            file.save(file_path)
-            profile_picture_path = f"uploads/profile_picture/{filename}"
+            # Create the user-specific directory
+            user_folder = os.path.join(current_app.config['UPLOAD_FOLDER_PROFILE'], str(user_id))
+            os.makedirs(user_folder, exist_ok=True)
+
+            # Save the file as profile_pic.<extension>
+            relative_path = f"uploads/users/{user_id}/profile_pic.{file_extension}"
+            full_path = os.path.join(user_folder, f"profile_pic.{file_extension}")
+
+            print(f"[DEBUG] Saving profile picture to: {full_path}")
+            file.save(full_path)
+
+            # Set the relative path to store in the database
+            profile_picture_path = relative_path
         except Exception as e:
             print(f"[ERROR] Failed to save profile picture: {e}")
             return jsonify({'message': 'Failed to save profile picture', 'error': str(e)}), 500
