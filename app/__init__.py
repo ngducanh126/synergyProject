@@ -35,6 +35,10 @@ def create_app():
             return {"error": "File not found"}, 404
         return send_from_directory(uploads_folder, filename)
 
+    # Create tables if they don't exist
+    with app.app_context():
+        create_tables()
+
     # Import and register Blueprints
     from app.auth_routes import auth_bp
     from app.profile_routes import profile_bp
@@ -49,3 +53,89 @@ def create_app():
     app.register_blueprint(collaboration_bp, url_prefix='/collaboration')  # Register here
 
     return app
+
+
+def create_tables():
+    """Create database tables if they don't exist."""
+    raw_sql = """
+    -- 1. Create the users table
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        likes INTEGER[] DEFAULT '{}',
+        bio TEXT,
+        skills TEXT[],
+        location VARCHAR(255),
+        availability VARCHAR(255),
+        swipe_right INTEGER[] DEFAULT '{}',
+        swipe_left INTEGER[] DEFAULT '{}',
+        matches INTEGER[] DEFAULT '{}',
+        preferred_medium TEXT[],
+        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        verification_status BOOLEAN DEFAULT FALSE
+    );
+
+    -- 2. Create the collaborations table
+    CREATE TABLE IF NOT EXISTS collaborations (
+        id SERIAL PRIMARY KEY,
+        admin_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 3. Create the user_collaborations table
+    CREATE TABLE IF NOT EXISTS user_collaborations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        collaboration_id INTEGER NOT NULL REFERENCES collaborations(id) ON DELETE CASCADE,
+        role VARCHAR(255) DEFAULT 'member'
+    );
+
+    -- 4. Create the collaboration_photos table
+    CREATE TABLE IF NOT EXISTS collaboration_photos (
+        id SERIAL PRIMARY KEY,
+        collaboration_id INTEGER NOT NULL REFERENCES collaborations(id) ON DELETE CASCADE,
+        photo_path TEXT NOT NULL
+    );
+
+    -- 5. Create the collections table
+    CREATE TABLE IF NOT EXISTS collections (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL
+    );
+
+    -- 6. Create the collection_items table
+    CREATE TABLE IF NOT EXISTS collection_items (
+        id SERIAL PRIMARY KEY,
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        content TEXT NOT NULL
+    );
+
+    -- 7. Create the collaboration_requests table
+    CREATE TABLE IF NOT EXISTS collaboration_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        collaboration_id INTEGER NOT NULL REFERENCES collaborations(id) ON DELETE CASCADE,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 8. Create the matches table
+    CREATE TABLE IF NOT EXISTS matches (
+        id SERIAL PRIMARY KEY,
+        user1_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user2_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        matched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS unique_match_pair
+    ON matches (LEAST(user1_id, user2_id), GREATEST(user1_id, user2_id));
+    """
+
+    # Execute raw SQL to create tables
+    db.session.execute(raw_sql)
+    db.session.commit()
