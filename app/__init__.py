@@ -35,17 +35,23 @@ def create_app():
             return {"error": "File not found"}, 404
         return send_from_directory(uploads_folder, filename)
 
+    # Add the new route here
+    @app.route('/')
+    def home():
+        return {"message": "Welcome to the Synergy Project API!"}, 200
+
     # Import and register Blueprints
     from app.auth_routes import auth_bp
     from app.profile_routes import profile_bp
     from app.match_routes import match_bp
     from app.chat_routes import chat_bp
-    from app.collaboration_routes import collaboration_bp  # Import moved inside
+    from app.collaboration_routes import collaboration_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(profile_bp, url_prefix='/profile')
     app.register_blueprint(match_bp, url_prefix='/match')
     app.register_blueprint(chat_bp, url_prefix='/chat')
-    app.register_blueprint(collaboration_bp, url_prefix='/collaboration')  # Register here
+    app.register_blueprint(collaboration_bp, url_prefix='/collaboration')
 
     return app
+
