@@ -54,8 +54,8 @@ def create_app():
 
     return app
 
-
 def create_tables():
+    # Define table creation statements
     table_creation_statements = [
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -137,7 +137,12 @@ def create_tables():
         """
     ]
 
-    with db.session.begin():
-        for statement in table_creation_statements:
+    # Execute each statement separately
+    for statement in table_creation_statements:
+        try:
             db.session.execute(statement)
+        except Exception as e:
+            print(f"Error executing statement: {e}")
+    db.session.commit()
+
 
