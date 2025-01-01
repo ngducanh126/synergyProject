@@ -1,6 +1,0 @@
-add match feature. lets say i am person a, when i click match button, i go to match page, all other people profile are displayed, i can click swipe left or swipe right button to like them, later on if person b likes me, this is a match and this data is stored in a page called my matches (also add a button called my matches in home)
-
-
-SELECT column_name, data_type, is_nullable, column_default
-FROM information_schema.columns
-WHERE table_name = 'users';
