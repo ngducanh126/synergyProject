@@ -316,7 +316,7 @@ def get_collections():
     print(f"[DEBUG] Retrieved collections: {collections_data}")
     return jsonify(collections_data), 200
 
-# getting collections for another user
+# Getting collections for another user
 @profile_bp.route('/collections/<int:collection_id>', methods=['GET'])
 @jwt_required()
 def get_collection_items(collection_id):
@@ -333,7 +333,9 @@ def get_collection_items(collection_id):
         for item in items:
             # Ensure the file path is normalized
             if item[3]:  # Check if file_path exists
-                normalized_file_path = f"http://127.0.0.1:5000/{item[3]}"  # Prefix with base URL
+                # Dynamically determine the base URL
+                base_url = request.host_url.rstrip('/')  # Removes trailing slash
+                normalized_file_path = f"{base_url}/{item[3]}"  # Prefix with base URL
             else:
                 normalized_file_path = None
 
@@ -351,6 +353,7 @@ def get_collection_items(collection_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
+
 
 # delete one of my collections
 @profile_bp.route('/collections/<int:collection_id>', methods=['DELETE'])
