@@ -10,7 +10,8 @@ app = create_app()
 CORS(app, resources={
     r"/*": {
         "origins": [
-            "https://synergyprojectfrontend.onrender.com",  # Deployed frontend URL
+            "https://synergyprojectfrontend.onrender.com", 
+            "https://regal-crepe-4301e6.netlify.app",
             "http://localhost:3000"  # Local development URL
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
