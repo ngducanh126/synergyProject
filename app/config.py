@@ -6,9 +6,12 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")  # No fallback for production
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-jwt-secret-key")
+
+    # Cloudinary configuration
+    CLOUDINARY_URL = os.getenv("CLOUDINARY_URL")
 
     BASE_URL = 'http://127.0.0.1:5000'  # Used for serving local files
 

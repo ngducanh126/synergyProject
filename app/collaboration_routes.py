@@ -1,21 +1,6 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from werkzeug.utils import secure_filename
-import os
-from app import db
-
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-collaboration_bp = Blueprint('collaboration', __name__)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-from flask import Blueprint, jsonify, request, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from werkzeug.utils import secure_filename
-import os
+import cloudinary.uploader
 from app import db
 
 
@@ -52,27 +37,19 @@ def create_collaboration():
         })
         collaboration_id = result.fetchone()[0]
 
-        profile_picture_path = None
+        profile_picture_url = None
         if file and allowed_file(file.filename):
-            # Extract the file extension
-            file_extension = file.filename.rsplit('.', 1)[1].lower()
-            
-            # Create the collaboration-specific directory
-            collaboration_folder = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id))
-            os.makedirs(collaboration_folder, exist_ok=True)
+            # Upload the file to Cloudinary
+            upload_result = cloudinary.uploader.upload(file, folder=f"collaborations/{collaboration_id}")
+            profile_picture_url = upload_result['secure_url']
 
-            # Save the file as profile_picture.<extension>
-            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.{file_extension}"
-            full_path = os.path.join(collaboration_folder, f"profile_picture.{file_extension}")
-            file.save(full_path)
-
-            # Update the profile picture path in the database (save relative path)
+            # Update the profile picture path in the database
             update_query = """
             UPDATE collaborations
             SET profile_picture = :profile_picture
             WHERE id = :collaboration_id;
             """
-            db.session.execute(update_query, {'profile_picture': relative_path, 'collaboration_id': collaboration_id})
+            db.session.execute(update_query, {'profile_picture': profile_picture_url, 'collaboration_id': collaboration_id})
             db.session.commit()
 
         # Add the creator as an admin to the user_collaborations table
@@ -83,7 +60,7 @@ def create_collaboration():
         db.session.execute(user_collab_query, {'user_id': user_id, 'collaboration_id': collaboration_id})
         db.session.commit()
 
-        return jsonify({'message': 'Collaboration created successfully', 'id': collaboration_id}), 201
+        return jsonify({'message': 'Collaboration created successfully', 'id': collaboration_id, 'profile_picture_url': profile_picture_url}), 201
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collaboration'}), 500
@@ -114,22 +91,12 @@ def edit_collaboration(collaboration_id):
             update_values['description'] = description
 
         if profile_picture and allowed_file(profile_picture.filename):
-            # Extract the file extension
-            file_extension = profile_picture.filename.rsplit('.', 1)[1].lower()
-            
-            # Create the collaboration-specific directory if it doesn't exist
-            collaboration_folder = os.path.join(current_app.config['UPLOAD_FOLDER_COLLABORATIONS'], str(collaboration_id))
-            os.makedirs(collaboration_folder, exist_ok=True)
-
-            # Save the file as profile_picture.<extension>
-            relative_path = f"uploads/collaborations/{collaboration_id}/profile_picture.{file_extension}"
-            full_path = os.path.join(collaboration_folder, f"profile_picture.{file_extension}")
-
-            print(f"[DEBUG] Saving profile picture to: {full_path}")
-            profile_picture.save(full_path)
+            # Upload the new profile picture to Cloudinary
+            upload_result = cloudinary.uploader.upload(profile_picture, folder=f"collaborations/{collaboration_id}")
+            profile_picture_url = upload_result['secure_url']
 
             update_fields.append("profile_picture = :profile_picture")
-            update_values['profile_picture'] = relative_path
+            update_values['profile_picture'] = profile_picture_url
 
         # Update the collaboration in the database
         if update_fields:
@@ -145,7 +112,6 @@ def edit_collaboration(collaboration_id):
     except Exception as e:
         print(f"[ERROR] Failed to update collaboration: {e}")
         return jsonify({'error': 'Failed to update collaboration.'}), 500
-
 
 
 # View all collaborations
@@ -185,7 +151,7 @@ def view_collaborations():
         return jsonify({'error': 'Failed to fetch collaborations'}), 500
 
 
-# Add photo to a collaboration (not implemented on front-end yet)  ; need to make storage logic better
+# Add photo to a collaboration (not implemented on front-end yet)  ; need to make storage logic better and use cloud
 @collaboration_bp.route('/<int:collaboration_id>/photos', methods=['POST'])
 @jwt_required()
 def add_photo_to_collaboration(collaboration_id):
@@ -224,7 +190,7 @@ def add_photo_to_collaboration(collaboration_id):
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to add photo'}), 500
 
-# View photos in a collaboration  (not implemented on front-end yet)  ; need to make storage logic better
+# View photos in a collaboration  (not implemented on front-end yet)  ; need to make storage logic better and use cloud
 @collaboration_bp.route('/<int:collaboration_id>/photos', methods=['GET'])
 @jwt_required()
 def view_collaboration_photos(collaboration_id):
