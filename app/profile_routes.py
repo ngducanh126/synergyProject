@@ -15,57 +15,61 @@ def allowed_file(filename):
 
 def save_profile_picture(file, user_id):
     """Save profile picture based on storage method."""
-    # Get configuration values from the app's config
     storage_method = current_app.config.get('STORAGE_METHOD', 'local')
     upload_folder_profile = current_app.config.get('UPLOAD_FOLDER_PROFILE', 'uploads/users')
     profile_picture_path = None
 
     print(f"[DEBUG] Storage method: {storage_method}")
     print(f"[DEBUG] Upload folder (profile): {upload_folder_profile}")
+    print(f"[DEBUG] Received file: {file.filename if file else 'No file received'}")
 
     try:
+        # Validate the file object and filename
         if not file or not file.filename:
-            raise ValueError("Invalid file object or filename")
+            raise ValueError("Invalid file object or filename provided to save_profile_picture")
 
-        # Check if the file type is allowed
+        # Validate allowed file extensions
         if not allowed_file(file.filename):
             raise ValueError(f"Unsupported file type: {file.filename}")
 
+        # Handle cloud storage
         if storage_method == 'cloudinary':
-            # Use Cloudinary to upload the profile picture
             cloudinary_folder = f"users/{user_id}"
-            print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
+            print(f"[DEBUG] Preparing to upload to Cloudinary. Folder: {cloudinary_folder}")
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    file,
+                    folder=cloudinary_folder,
+                    public_id="profile_pic",  # Save as profile_pic
+                    overwrite=True,
+                    resource_type="image"
+                )
+                profile_picture_path = upload_result.get('secure_url')
+                if not profile_picture_path:
+                    raise ValueError("Cloudinary did not return a secure_url")
+                print(f"[DEBUG] Uploaded to Cloudinary successfully. URL: {profile_picture_path}")
+            except Exception as cloudinary_error:
+                print(f"[ERROR] Cloudinary upload failed: {str(cloudinary_error)}")
+                raise
 
-            upload_result = cloudinary.uploader.upload(
-                file,
-                folder=cloudinary_folder,
-                public_id="profile_pic",  # Save as profile_pic in the user's folder
-                overwrite=True,          # Replace existing profile_pic
-                resource_type="image"    # Ensure the resource type is set to "image"
-            )
-            profile_picture_path = upload_result['secure_url']  # Cloudinary's secure URL
-            print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
-
+        # Handle local storage
         else:
-            # Save locally
             file_extension = file.filename.rsplit('.', 1)[1].lower()
             print(f"[DEBUG] File extension: {file_extension}")
-            
+
             user_folder = os.path.join(upload_folder_profile, str(user_id))
             print(f"[DEBUG] Local user folder: {user_folder}")
-            
-            os.makedirs(user_folder, exist_ok=True)  # Create directory if it doesn't exist
-            
+
+            os.makedirs(user_folder, exist_ok=True)  # Create directory if not exists
             filename = f"profile_pic.{file_extension}"
-            print(f"[DEBUG] Filename: {filename}")
-            
+            print(f"[DEBUG] Filename for saving locally: {filename}")
+
             file_path = os.path.join(user_folder, filename)
             print(f"[DEBUG] File path before saving: {file_path}")
-            
-            file.save(file_path)
-            print(f"[DEBUG] File saved at: {file_path}")
 
-            # Save only the relative path in the database
+            file.save(file_path)
+            print(f"[DEBUG] File saved locally at: {file_path}")
+
             profile_picture_path = os.path.join(upload_folder_profile, str(user_id), filename).replace("\\", "/")
             print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
 
@@ -74,7 +78,6 @@ def save_profile_picture(file, user_id):
         raise
 
     return profile_picture_path
-
 
 
 # View my profile
@@ -137,13 +140,18 @@ def view_profile():
 @jwt_required()
 def update_profile():
     user_id = get_jwt_identity()
+    print(f"[DEBUG] Received request to update profile for user_id: {user_id}")
 
     # Check if the user exists
-    user_query = "SELECT id FROM users WHERE id = :user_id;"
-    user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
-
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
+    try:
+        user_query = "SELECT id FROM users WHERE id = :user_id;"
+        user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
+        if not user:
+            print("[DEBUG] User not found in the database.")
+            return jsonify({'message': 'User not found'}), 404
+    except Exception as db_error:
+        print(f"[ERROR] Database query failed: {str(db_error)}")
+        return jsonify({'message': 'Database query failed', 'error': str(db_error)}), 500
 
     # Initialize variables
     bio = request.form.get('bio')
@@ -152,20 +160,24 @@ def update_profile():
     availability = request.form.get('availability')
     file = request.files.get('profile_picture')
 
+    print(f"[DEBUG] Received form data - Bio: {bio}, Skills: {skills}, Location: {location}, Availability: {availability}")
+    print(f"[DEBUG] Received file: {file.filename if file else 'No file received'}")
+
     # Handle profile picture upload
     profile_picture_path = None
-    if file and allowed_file(file.filename):
+    if file:
         try:
+            print("[DEBUG] Attempting to save profile picture...")
             profile_picture_path = save_profile_picture(file, user_id)
-            
-            # Log the path to store the profile picture
-            print(f"[LOG] Profile picture stored at: {profile_picture_path}")
+            print(f"[DEBUG] Profile picture saved at: {profile_picture_path}")
         except Exception as e:
+            print(f"[ERROR] Profile picture upload failed: {str(e)}")
             return jsonify({'message': 'Failed to upload profile picture', 'error': str(e)}), 500
 
     # Convert skills to PostgreSQL array format
     if skills:
         skills = "{" + ",".join(skill.strip() for skill in skills.split(',')) + "}"
+        print(f"[DEBUG] Converted skills to PostgreSQL array format: {skills}")
 
     # Update profile data in the database
     update_query = """
@@ -190,8 +202,8 @@ def update_profile():
             },
         )
         db.session.commit()
+        print("[DEBUG] Profile updated in the database successfully.")
 
-        # Include the full URL in the response
         full_url = (
             f"{current_app.config['BASE_URL']}/{profile_picture_path}" if profile_picture_path else None
         )
@@ -199,8 +211,10 @@ def update_profile():
             'message': 'Profile updated successfully',
             'profile_picture_url': full_url
         }), 200
-    except Exception as e:
-        return jsonify({'message': 'Failed to update profile', 'error': str(e)}), 500
+    except Exception as db_error:
+        print(f"[ERROR] Failed to update profile in database: {str(db_error)}")
+        return jsonify({'message': 'Failed to update profile', 'error': str(db_error)}), 500
+
 
 
 
