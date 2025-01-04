@@ -1,1 +1,2 @@
-.env
+.env.developments
+.env.production

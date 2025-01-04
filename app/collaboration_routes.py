@@ -1,15 +1,61 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import os
 import cloudinary.uploader
 from app import db
-
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 collaboration_bp = Blueprint('collaboration', __name__)
 
 def allowed_file(filename):
+    """Check if the file has an allowed extension."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_profile_picture(file, collaboration_id, is_edit=False):
+    """Save profile picture based on storage method."""
+    # Get configuration values from the app's config
+    storage_method = current_app.config.get('STORAGE_METHOD', 'local')  # Default to local
+    upload_folder_collaborations = current_app.config['UPLOAD_FOLDER_COLLABORATIONS']  # Get local folder from config
+    profile_picture_path = None
+
+    print(f"[DEBUG] Storage method: {storage_method}")
+    print(f"[DEBUG] Upload folder (collaborations): {upload_folder_collaborations}")
+
+    if storage_method == 'cloudinary':
+        # Use Cloudinary to upload the profile picture
+        folder = f"collaborations/{collaboration_id}"  # Cloudinary folder structure
+        print(f"[DEBUG] Cloudinary folder: {folder}")
+        upload_result = cloudinary.uploader.upload(
+            file,
+            folder=folder,
+            public_id="profile_picture",  # Save as profile_picture in the collaboration's folder
+            overwrite=is_edit,           # Replace existing profile picture if editing
+            resource_type="image"
+        )
+        profile_picture_path = upload_result['secure_url']  # Use secure URL from Cloudinary
+        print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
+    else:
+        # Save locally
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        print(f"[DEBUG] File extension: {file_extension}")
+        collaboration_folder = os.path.join(upload_folder_collaborations, str(collaboration_id))  # Use folder from config
+        print(f"[DEBUG] Local collaboration folder: {collaboration_folder}")
+        os.makedirs(collaboration_folder, exist_ok=True)  # Create directory if it doesn't exist
+        filename = "profile_picture.jpg" if is_edit else f"profile_picture.{file_extension}"
+        print(f"[DEBUG] Filename: {filename}")
+        file_path = os.path.join(collaboration_folder, filename)  # Full path for the file
+        print(f"[DEBUG] File path before saving: {file_path}")
+        file.save(file_path)  # Save file locally
+        print(f"[DEBUG] File saved at: {file_path}")
+
+        # Save only the relative path in the database
+        profile_picture_path = os.path.join(upload_folder_collaborations, str(collaboration_id), filename).replace("\\", "/")
+        print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
+
+    return profile_picture_path
+
+
 
 # Create a collaboration
 @collaboration_bp.route('/create', methods=['POST'])
@@ -39,9 +85,7 @@ def create_collaboration():
 
         profile_picture_url = None
         if file and allowed_file(file.filename):
-            # Upload the file to Cloudinary
-            upload_result = cloudinary.uploader.upload(file, folder=f"collaborations/{collaboration_id}")
-            profile_picture_url = upload_result['secure_url']
+            profile_picture_url = save_profile_picture(file, collaboration_id)
 
             # Update the profile picture path in the database
             update_query = """
@@ -64,7 +108,6 @@ def create_collaboration():
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collaboration'}), 500
-
 
 # Edit a collaboration
 @collaboration_bp.route('/edit/<int:collaboration_id>', methods=['PUT'])
@@ -91,10 +134,7 @@ def edit_collaboration(collaboration_id):
             update_values['description'] = description
 
         if profile_picture and allowed_file(profile_picture.filename):
-            # Upload the new profile picture to Cloudinary
-            upload_result = cloudinary.uploader.upload(profile_picture, folder=f"collaborations/{collaboration_id}")
-            profile_picture_url = upload_result['secure_url']
-
+            profile_picture_url = save_profile_picture(profile_picture, collaboration_id, is_edit=True)
             update_fields.append("profile_picture = :profile_picture")
             update_values['profile_picture'] = profile_picture_url
 
@@ -112,7 +152,6 @@ def edit_collaboration(collaboration_id):
     except Exception as e:
         print(f"[ERROR] Failed to update collaboration: {e}")
         return jsonify({'error': 'Failed to update collaboration.'}), 500
-
 
 # View all collaborations
 @collaboration_bp.route('/view', methods=['GET'])

@@ -1,20 +1,64 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from werkzeug.utils import secure_filename
 import os
-from flask import send_from_directory
-from werkzeug.utils import secure_filename
+import cloudinary.uploader
 
 profile_bp = Blueprint('profile', __name__)
 
 # Define allowed extensions
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
 def allowed_file(filename):
+    """Check if the file has an allowed extension."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def save_profile_picture(file, user_id):
+    """Save profile picture based on storage method."""
+    # Get configuration values from the app's config
+    storage_method = current_app.config['STORAGE_METHOD']
+    upload_folder_profile = current_app.config['UPLOAD_FOLDER_PROFILE']
+    profile_picture_path = None
 
-# view my profile
+    print(f"[DEBUG] Storage method: {storage_method}")
+    print(f"[DEBUG] Upload folder (profile): {upload_folder_profile}")
+
+    if storage_method == 'cloudinary':
+        # Use Cloudinary to upload the profile picture
+        cloudinary_folder = f"users/{user_id}"
+        print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
+        upload_result = cloudinary.uploader.upload(
+            file,
+            folder=cloudinary_folder,
+            public_id="profile_pic",  # Save as profile_pic in the user's folder
+            overwrite=True,          # Replace existing profile_pic
+            resource_type="image"
+        )
+        profile_picture_path = upload_result['secure_url']  # Use Cloudinary's secure URL
+        print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
+    else:
+        # Save locally
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        print(f"[DEBUG] File extension: {file_extension}")
+        user_folder = os.path.join(upload_folder_profile, str(user_id))
+        print(f"[DEBUG] Local user folder: {user_folder}")
+        os.makedirs(user_folder, exist_ok=True)
+        filename = f"profile_pic.{file_extension}"
+        print(f"[DEBUG] Filename: {filename}")
+        file_path = os.path.join(user_folder, filename)
+        print(f"[DEBUG] File path before saving: {file_path}")
+        file.save(file_path)
+        print(f"[DEBUG] File saved at: {file_path}")
+
+        # Save only the relative path in the database
+        profile_picture_path = os.path.join(upload_folder_profile, str(user_id), filename).replace("\\", "/")
+        print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
+
+    return profile_picture_path
+
+
+
+# View my profile
 @profile_bp.route('/view', methods=['GET'])
 @jwt_required()
 def view_profile():
@@ -30,10 +74,7 @@ def view_profile():
         user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
 
         if not user:
-            print(f"[DEBUG] User with ID {user_id} not found.")
             return jsonify({'message': 'User not found'}), 404
-
-        print(f"[DEBUG] Retrieved user: ID={user[0]}, Username={user[1]}, Profile Picture={user[7]}")
 
         # Fetch collaborations where the user is a member or admin
         collaborations_query = """
@@ -48,15 +89,14 @@ def view_profile():
         """
         collaborations = db.session.execute(collaborations_query, {'user_id': user_id}).fetchall()
 
-        collaborations_data = []
-        for collab in collaborations:
-            print(f"[DEBUG] Collaboration: ID={collab[0]}, Name={collab[1]}, Role={collab[3]}")
-            collaborations_data.append({
+        collaborations_data = [
+            {
                 'id': collab[0],
                 'name': collab[1],
                 'description': collab[2],
-                'role': collab[3]  # Add the role field (admin/member)
-            })
+                'role': collab[3]
+            } for collab in collaborations
+        ]
 
         user_data = {
             'id': user[0],
@@ -66,21 +106,14 @@ def view_profile():
             'location': user[4],
             'availability': user[5],
             'verification_status': user[6],
-            'profile_picture': user[7],  # Include profile_picture in the response
-            'collaborations': collaborations_data,  # Add collaborations to the response
+            'profile_picture': user[7],
+            'collaborations': collaborations_data,
         }
 
-        print("[DEBUG] Final user data response:")
-        print(user_data)
-
         return jsonify(user_data), 200
-
     except Exception as e:
-        print(f"[ERROR] Failed to fetch profile: {e}")
-        return jsonify({'message': 'Failed to fetch profile'}), 500
+        return jsonify({'message': 'Failed to fetch profile', 'error': str(e)}), 500
 
-
-# Update my profile
 @profile_bp.route('/update', methods=['PUT'])
 @jwt_required()
 def update_profile():
@@ -104,25 +137,9 @@ def update_profile():
     profile_picture_path = None
     if file and allowed_file(file.filename):
         try:
-            # Extract file extension
-            file_extension = file.filename.rsplit('.', 1)[1].lower()
-
-            # Create the user-specific directory
-            user_folder = os.path.join(current_app.config['UPLOAD_FOLDER_PROFILE'], str(user_id))
-            os.makedirs(user_folder, exist_ok=True)
-
-            # Save the file as profile_pic.<extension>
-            relative_path = f"uploads/users/{user_id}/profile_pic.{file_extension}"
-            full_path = os.path.join(user_folder, f"profile_pic.{file_extension}")
-
-            print(f"[DEBUG] Saving profile picture to: {full_path}")
-            file.save(full_path)
-
-            # Set the relative path to store in the database
-            profile_picture_path = relative_path
+            profile_picture_path = save_profile_picture(file, user_id)
         except Exception as e:
-            print(f"[ERROR] Failed to save profile picture: {e}")
-            return jsonify({'message': 'Failed to save profile picture', 'error': str(e)}), 500
+            return jsonify({'message': 'Failed to upload profile picture', 'error': str(e)}), 500
 
     # Convert skills to PostgreSQL array format
     if skills:
@@ -151,10 +168,18 @@ def update_profile():
             },
         )
         db.session.commit()
-        return jsonify({'message': 'Profile updated successfully'}), 200
+
+        # Include the full URL in the response
+        full_url = (
+            f"{current_app.config['BASE_URL']}/{profile_picture_path}" if profile_picture_path else None
+        )
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'profile_picture_url': full_url
+        }), 200
     except Exception as e:
-        print(f"[ERROR] Failed to update profile: {e}")
         return jsonify({'message': 'Failed to update profile', 'error': str(e)}), 500
+
 
 
 # Fetch other users' profiles
@@ -245,15 +270,19 @@ def create_collection():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collection'}), 500
 
-# POST an item to one of my collection
 @profile_bp.route('/collections/<int:collection_id>/items', methods=['POST'])
 @jwt_required()
 def add_item_to_collection(collection_id):
+    """Add an item to a collection."""
     try:
         user_id = get_jwt_identity()
         print(f"[DEBUG] User ID: {user_id}, Collection ID: {collection_id}")
 
-        # Check if the request contains a file
+        # Initialize variables
+        item_type = None
+        content = None
+        file_path = None
+
         if 'file' in request.files:
             # Handle file uploads
             file = request.files.get('file')
@@ -262,20 +291,41 @@ def add_item_to_collection(collection_id):
             print(f"[DEBUG] Form data (file upload): Type: {item_type}, Content: {content}, File: {file.filename if file else 'None'}")
 
             if file:
-                filename = secure_filename(file.filename)
-                file_path = os.path.join('uploads', filename)  # Store relative path
-                print(f"[DEBUG] Preparing to save file at: {file_path}")
-                full_save_path = os.path.join(os.getcwd(), file_path)
-                file.save(full_save_path)
-                print(f"[DEBUG] File saved at: {full_save_path}")
+                # Save the file locally or to Cloudinary
+                storage_method = current_app.config['STORAGE_METHOD']
+                upload_folder_collection = current_app.config['UPLOAD_ITEM_COLLECTION']
+                print(f"[DEBUG] Storage method: {storage_method}")
+
+                file_extension = file.filename.rsplit('.', 1)[1].lower()
+                filename = f"item_{collection_id}_{user_id}.{file_extension}"
+                relative_path = os.path.join(upload_folder_collection, str(collection_id), filename).replace("\\", "/")
+
+                if storage_method == 'cloudinary':
+                    cloudinary_folder = f"collections/{collection_id}"
+                    print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
+                    upload_result = cloudinary.uploader.upload(
+                        file,
+                        folder=cloudinary_folder,
+                        public_id=filename.rsplit('.', 1)[0],
+                        overwrite=True,
+                        resource_type="image"
+                    )
+                    file_path = upload_result['secure_url']
+                else:
+                    # Save locally
+                    local_folder = os.path.join(upload_folder_collection, str(collection_id))
+                    os.makedirs(local_folder, exist_ok=True)
+                    full_path = os.path.join(local_folder, filename)
+                    file.save(full_path)
+                    file_path = relative_path
+                    print(f"[DEBUG] File saved locally at: {full_path}")
             else:
-                file_path = None
+                print("[DEBUG] No file uploaded.")
         else:
             # Handle JSON payloads
             data = request.get_json()
             item_type = data.get('type')
             content = data.get('content')
-            file_path = None  # No file for text-based items
             print(f"[DEBUG] JSON data: Type: {item_type}, Content: {content}")
 
         # Ensure mandatory fields are present
@@ -292,15 +342,17 @@ def add_item_to_collection(collection_id):
             'collection_id': collection_id,
             'type': item_type,
             'content': content,
-            'file_path': file_path  # Store relative path only
+            'file_path': file_path  # Store relative path or Cloudinary URL
         })
         db.session.commit()
 
         print(f"[DEBUG] Item added to database - Type: {item_type}, Content: {content}, File Path: {file_path}")
         return jsonify({'message': 'Item added to collection successfully', 'file_path': file_path}), 201
+
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
+
 
 # getting my collections
 @profile_bp.route('/collections', methods=['GET'])
