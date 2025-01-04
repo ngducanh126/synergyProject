@@ -16,52 +16,62 @@ def allowed_file(filename):
 def save_profile_picture(file, user_id):
     """Save profile picture based on storage method."""
     # Get configuration values from the app's config
-    storage_method = current_app.config['STORAGE_METHOD']
-    upload_folder_profile = current_app.config['UPLOAD_FOLDER_PROFILE']
+    storage_method = current_app.config.get('STORAGE_METHOD', 'local')
+    upload_folder_profile = current_app.config.get('UPLOAD_FOLDER_PROFILE', 'uploads/users')
     profile_picture_path = None
 
     print(f"[DEBUG] Storage method: {storage_method}")
     print(f"[DEBUG] Upload folder (profile): {upload_folder_profile}")
 
-    if storage_method == 'cloudinary':
-        # Use Cloudinary to upload the profile picture
-        cloudinary_folder = f"users/{user_id}"
-        print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
+    try:
+        if not file or not file.filename:
+            raise ValueError("Invalid file object or filename")
 
-        try:
-            # Check if file is readable
-            if not file or not file.filename:
-                raise ValueError("Invalid file object or filename")
+        # Check if the file type is allowed
+        if not allowed_file(file.filename):
+            raise ValueError(f"Unsupported file type: {file.filename}")
+
+        if storage_method == 'cloudinary':
+            # Use Cloudinary to upload the profile picture
+            cloudinary_folder = f"users/{user_id}"
+            print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
 
             upload_result = cloudinary.uploader.upload(
                 file,
                 folder=cloudinary_folder,
                 public_id="profile_pic",  # Save as profile_pic in the user's folder
                 overwrite=True,          # Replace existing profile_pic
-                resource_type="image"
+                resource_type="image"    # Ensure the resource type is set to "image"
             )
             profile_picture_path = upload_result['secure_url']  # Cloudinary's secure URL
             print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
-        except Exception as e:
-            print(f"[ERROR] Cloudinary upload failed: {str(e)}")
-            raise
-    else:
-        # Save locally
-        file_extension = file.filename.rsplit('.', 1)[1].lower()
-        print(f"[DEBUG] File extension: {file_extension}")
-        user_folder = os.path.join(upload_folder_profile, str(user_id))
-        print(f"[DEBUG] Local user folder: {user_folder}")
-        os.makedirs(user_folder, exist_ok=True)
-        filename = f"profile_pic.{file_extension}"
-        print(f"[DEBUG] Filename: {filename}")
-        file_path = os.path.join(user_folder, filename)
-        print(f"[DEBUG] File path before saving: {file_path}")
-        file.save(file_path)
-        print(f"[DEBUG] File saved at: {file_path}")
 
-        # Save only the relative path in the database
-        profile_picture_path = os.path.join(upload_folder_profile, str(user_id), filename).replace("\\", "/")
-        print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
+        else:
+            # Save locally
+            file_extension = file.filename.rsplit('.', 1)[1].lower()
+            print(f"[DEBUG] File extension: {file_extension}")
+            
+            user_folder = os.path.join(upload_folder_profile, str(user_id))
+            print(f"[DEBUG] Local user folder: {user_folder}")
+            
+            os.makedirs(user_folder, exist_ok=True)  # Create directory if it doesn't exist
+            
+            filename = f"profile_pic.{file_extension}"
+            print(f"[DEBUG] Filename: {filename}")
+            
+            file_path = os.path.join(user_folder, filename)
+            print(f"[DEBUG] File path before saving: {file_path}")
+            
+            file.save(file_path)
+            print(f"[DEBUG] File saved at: {file_path}")
+
+            # Save only the relative path in the database
+            profile_picture_path = os.path.join(upload_folder_profile, str(user_id), filename).replace("\\", "/")
+            print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
+
+    except Exception as e:
+        print(f"[ERROR] Failed to save profile picture: {str(e)}")
+        raise
 
     return profile_picture_path
 
