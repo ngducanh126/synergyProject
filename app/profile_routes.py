@@ -138,6 +138,9 @@ def update_profile():
     if file and allowed_file(file.filename):
         try:
             profile_picture_path = save_profile_picture(file, user_id)
+            
+            # Log the path to store the profile picture
+            print(f"[LOG] Profile picture stored at: {profile_picture_path}")
         except Exception as e:
             return jsonify({'message': 'Failed to upload profile picture', 'error': str(e)}), 500
 
@@ -179,6 +182,7 @@ def update_profile():
         }), 200
     except Exception as e:
         return jsonify({'message': 'Failed to update profile', 'error': str(e)}), 500
+
 
 
 
