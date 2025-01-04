@@ -27,13 +27,17 @@ def save_profile_picture(file, user_id):
         # Use Cloudinary to upload the profile picture
         cloudinary_folder = f"users/{user_id}"
         print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
-        upload_result = cloudinary.uploader.upload(
-            file,
-            folder=cloudinary_folder,
-            public_id="profile_pic",  # Save as profile_pic in the user's folder
-            overwrite=True,          # Replace existing profile_pic
-            resource_type="image"
-        )
+        try:
+            upload_result = cloudinary.uploader.upload(
+                file,
+                folder=cloudinary_folder,
+                public_id="profile_pic",
+                overwrite=True,
+                resource_type="image"
+            )
+        except Exception as e:
+            print(f"[ERROR] Cloudinary upload failed: {str(e)}")
+            raise
         profile_picture_path = upload_result['secure_url']  # Use Cloudinary's secure URL
         print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
     else:
@@ -182,7 +186,6 @@ def update_profile():
         }), 200
     except Exception as e:
         return jsonify({'message': 'Failed to update profile', 'error': str(e)}), 500
-
 
 
 
