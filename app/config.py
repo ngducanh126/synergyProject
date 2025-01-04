@@ -1,13 +1,10 @@
 import os
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 
-# Explicitly load the .env file
-env_file = find_dotenv(filename=".env")
-if env_file:
-    print(f"[DEBUG] Loaded .env from: {env_file}")
-    load_dotenv(env_file)
-else:
-    print("[DEBUG] No .env file found. Ensure .env exists in the root directory.")
+# Load environment variables from .env (only for local development)
+if os.getenv("FLASK_ENV") != "production":
+    load_dotenv()
+    print("[DEBUG] Loaded .env file for local development.")
 
 class Config:
     """Base configuration."""
@@ -23,8 +20,8 @@ class Config:
     BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
 
     # Default upload folder structure
-    UPLOAD_FOLDER_COLLABORATIONS = "uploads/collaborations"
-    UPLOAD_FOLDER_PROFILE = "uploads/users"
+    UPLOAD_FOLDER_COLLABORATIONS = os.getenv("UPLOAD_FOLDER_COLLABORATIONS", "uploads/collaborations")
+    UPLOAD_FOLDER_PROFILE = os.getenv("UPLOAD_FOLDER_PROFILE", "uploads/users")
     UPLOAD_ITEM_COLLECTION = os.getenv("UPLOAD_ITEM_COLLECTION", "uploads/collections")
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -38,19 +35,5 @@ class Config:
     # Storage method
     STORAGE_METHOD = os.getenv("STORAGE_METHOD", "local")
 
-
-class DevelopmentConfig(Config):
-    """Development-specific configuration."""
-    DEBUG = True
-
-
-class ProductionConfig(Config):
-    """Production-specific configuration."""
-    DEBUG = False
-
-
-# Dynamically set the configuration based on the environment
-config = {
-    "development": DevelopmentConfig,
-    "production": ProductionConfig
-}[os.getenv("FLASK_ENV", "development")]
+    # Debug mode
+    DEBUG = os.getenv("FLASK_ENV") != "production"

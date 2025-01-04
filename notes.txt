@@ -1,5 +1,7 @@
-For local development, export the environment variable before running the app:
-export FLASK_ENV=development
-flask run
+For local development, export the environment variable before running the app in windows:
+$env:FLASK_ENV="development"
+python run.py
 
 For production, ensure the hosting platform sets FLASK_ENV=production.
+$env:FLASK_ENV="production"
+python run.py

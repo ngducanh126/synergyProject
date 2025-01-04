@@ -270,6 +270,7 @@ def create_collection():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collection'}), 500
 
+# Add an item to collection
 @profile_bp.route('/collections/<int:collection_id>/items', methods=['POST'])
 @jwt_required()
 def add_item_to_collection(collection_id):
