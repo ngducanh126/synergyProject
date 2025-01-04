@@ -27,19 +27,24 @@ def save_profile_picture(file, user_id):
         # Use Cloudinary to upload the profile picture
         cloudinary_folder = f"users/{user_id}"
         print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
+
         try:
+            # Check if file is readable
+            if not file or not file.filename:
+                raise ValueError("Invalid file object or filename")
+
             upload_result = cloudinary.uploader.upload(
                 file,
                 folder=cloudinary_folder,
-                public_id="profile_pic",
-                overwrite=True,
+                public_id="profile_pic",  # Save as profile_pic in the user's folder
+                overwrite=True,          # Replace existing profile_pic
                 resource_type="image"
             )
+            profile_picture_path = upload_result['secure_url']  # Cloudinary's secure URL
+            print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
         except Exception as e:
             print(f"[ERROR] Cloudinary upload failed: {str(e)}")
             raise
-        profile_picture_path = upload_result['secure_url']  # Use Cloudinary's secure URL
-        print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
     else:
         # Save locally
         file_extension = file.filename.rsplit('.', 1)[1].lower()
