@@ -2,3 +2,4 @@
 .env.production
 .env
 app/__pycache__/
+venv
