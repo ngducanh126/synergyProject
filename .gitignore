@@ -1,2 +1,4 @@
-.env.developments
+.env.development
 .env.production
+.env
+app/__pycache__/
