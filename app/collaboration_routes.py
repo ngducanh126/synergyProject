@@ -679,3 +679,9 @@ def delete_collaboration(collaboration_id):
     """Delete a collaboration."""
     return jsonify({'message': 'Collaboration deleted.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/transfer-ownership', methods=['POST'])
+@jwt_required()
+def transfer_collaboration_ownership(collaboration_id):
+    """Transfer ownership of a collaboration to another user."""
+    return jsonify({'message': 'Collaboration ownership transferred.'}), 200
+
