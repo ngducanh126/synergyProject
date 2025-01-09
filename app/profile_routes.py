@@ -3,6 +3,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 import os
 import cloudinary.uploader
+import cloudinary.api  # Explicitly import the api submodule
+import cloudinary
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -36,9 +38,20 @@ def save_profile_picture(file, user_id):
         if storage_method == 'cloudinary':
             cloudinary_folder = f"users/{user_id}"
             print(f"[DEBUG] Preparing to upload to Cloudinary. Folder: {cloudinary_folder}")
+
+            # Test Cloudinary connection
             try:
+                cloudinary.api.ping()
+                print("[DEBUG] Cloudinary connection successful.")
+            except Exception as connection_error:
+                print(f"[ERROR] Cloudinary connection failed: {str(connection_error)}")
+                raise ValueError("Failed to connect to Cloudinary. Check your credentials and network.")
+
+            try:
+                # Convert file to a file-like object
+                file_stream = file.stream
                 upload_result = cloudinary.uploader.upload(
-                    file,
+                    file_stream,
                     folder=cloudinary_folder,
                     public_id="profile_pic",  # Save as profile_pic
                     overwrite=True,
@@ -78,6 +91,7 @@ def save_profile_picture(file, user_id):
         raise
 
     return profile_picture_path
+
 
 
 # View my profile
