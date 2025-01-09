@@ -5,6 +5,7 @@ import os
 import cloudinary.uploader
 import cloudinary.api  # Explicitly import the api submodule
 import cloudinary
+import tempfile
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -39,24 +40,15 @@ def save_profile_picture(file, user_id):
             cloudinary_folder = f"users/{user_id}"
             print(f"[DEBUG] Preparing to upload to Cloudinary. Folder: {cloudinary_folder}")
 
-            # Test Cloudinary connection
-            try:
-                cloudinary.config(
-                    cloud_name="adn56",
-                    api_key="924477467695682",
-                    api_secret="G57N5CgBQSw0vap-BhXmk6CGNCw"
-                )
-                cloudinary.api.ping()
-                print("[DEBUG] Cloudinary connection successful.")
-            except Exception as connection_error:
-                print(f"[ERROR] Cloudinary connection failed: {str(connection_error)}")
-                raise ValueError("Failed to connect to Cloudinary. Check your credentials and network.")
+            # Save file to a temporary location
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                file.save(temp_file.name)  # Save the file to the temporary location
+                temp_file_path = temp_file.name
 
             try:
-                # Convert file to a file-like object
-                file_stream = file.stream
+                # Upload to Cloudinary using the temporary file path
                 upload_result = cloudinary.uploader.upload(
-                    file_stream,
+                    temp_file_path,
                     folder=cloudinary_folder,
                     public_id="profile_pic",  # Save as profile_pic
                     overwrite=True,
@@ -66,37 +58,16 @@ def save_profile_picture(file, user_id):
                 if not profile_picture_path:
                     raise ValueError("Cloudinary did not return a secure_url")
                 print(f"[DEBUG] Uploaded to Cloudinary successfully. URL: {profile_picture_path}")
-            except Exception as cloudinary_error:
-                print(f"[ERROR] Cloudinary upload failed: {str(cloudinary_error)}")
-                raise
-
-        # Handle local storage
+            finally:
+                os.unlink(temp_file_path)  # Remove the temporary file
         else:
-            file_extension = file.filename.rsplit('.', 1)[1].lower()
-            print(f"[DEBUG] File extension: {file_extension}")
-
-            user_folder = os.path.join(upload_folder_profile, str(user_id))
-            print(f"[DEBUG] Local user folder: {user_folder}")
-
-            os.makedirs(user_folder, exist_ok=True)  # Create directory if not exists
-            filename = f"profile_pic.{file_extension}"
-            print(f"[DEBUG] Filename for saving locally: {filename}")
-
-            file_path = os.path.join(user_folder, filename)
-            print(f"[DEBUG] File path before saving: {file_path}")
-
-            file.save(file_path)
-            print(f"[DEBUG] File saved locally at: {file_path}")
-
-            profile_picture_path = os.path.join(upload_folder_profile, str(user_id), filename).replace("\\", "/")
-            print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
+            raise ValueError("Unsupported storage method")
 
     except Exception as e:
         print(f"[ERROR] Failed to save profile picture: {str(e)}")
         raise
 
     return profile_picture_path
-
 
 
 
