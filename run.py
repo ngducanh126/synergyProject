@@ -1,3 +1,5 @@
+import cloudinary
+import cloudinary.api
 from flask_cors import CORS
 from flask import send_from_directory
 from app import create_app, socketio
@@ -17,6 +19,19 @@ CORS(app, resources={
         "supports_credentials": True,
     }
 })
+
+# Cloudinary connection test
+print("[INFO] Testing Cloudinary connection...")
+cloudinary.config(
+    cloud_name="adn56",
+    api_key="924477467695682",
+    api_secret="G57N5CgBQSw0vap-BhXmk6CGNCw"
+)
+try:
+    response = cloudinary.api.ping()
+    print("[DEBUG] Cloudinary connection successful:", response)
+except Exception as e:
+    print("[ERROR] Cloudinary connection failed:", e)
 
 # Log the environment and allowed CORS origins
 print(f"[INFO] Running in {'production' if os.getenv('FLASK_ENV') == 'production' else 'development'} mode")
