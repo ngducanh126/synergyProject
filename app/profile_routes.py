@@ -41,6 +41,11 @@ def save_profile_picture(file, user_id):
 
             # Test Cloudinary connection
             try:
+                cloudinary.config(
+                    cloud_name="adn56",
+                    api_key="924477467695682",
+                    api_secret="G57N5CgBQSw0vap-BhXmk6CGNCw"
+                )
                 cloudinary.api.ping()
                 print("[DEBUG] Cloudinary connection successful.")
             except Exception as connection_error:
@@ -91,6 +96,7 @@ def save_profile_picture(file, user_id):
         raise
 
     return profile_picture_path
+
 
 
 
