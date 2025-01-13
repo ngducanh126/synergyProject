@@ -1,7 +1,11 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import boto3
+import mimetypes
 import os
-import cloudinary.uploader
+import tempfile
+from botocore.config import Config as BotoConfig
+from botocore.exceptions import NoCredentialsError
 from app import db
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -13,45 +17,56 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def save_profile_picture(file, collaboration_id, is_edit=False):
-    """Save profile picture based on storage method."""
-    # Get configuration values from the app's config
-    storage_method = current_app.config.get('STORAGE_METHOD', 'local')  # Default to local
-    upload_folder_collaborations = current_app.config['UPLOAD_FOLDER_COLLABORATIONS']  # Get local folder from config
+    """Save profile picture for a collaboration based on the configured storage method."""
     profile_picture_path = None
 
-    print(f"[DEBUG] Storage method: {storage_method}")
-    print(f"[DEBUG] Upload folder (collaborations): {upload_folder_collaborations}")
+    try:
 
-    if storage_method == 'cloudinary':
-        # Use Cloudinary to upload the profile picture
-        folder = f"collaborations/{collaboration_id}"  # Cloudinary folder structure
-        print(f"[DEBUG] Cloudinary folder: {folder}")
-        upload_result = cloudinary.uploader.upload(
-            file,
-            folder=folder,
-            public_id="profile_picture",  # Save as profile_picture in the collaboration's folder
-            overwrite=is_edit,           # Replace existing profile picture if editing
-            resource_type="image"
+        # Create S3 client with environment variables
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=current_app.config['AWS_ACCESS_KEY'],
+            aws_secret_access_key=current_app.config['AWS_SECRET_KEY'],
+            region_name=current_app.config['AWS_REGION'],
+            config=BotoConfig(connect_timeout=5, read_timeout=10, retries={'max_attempts': 3})
         )
-        profile_picture_path = upload_result['secure_url']  # Use secure URL from Cloudinary
-        print(f"[DEBUG] Uploaded to Cloudinary, secure URL: {profile_picture_path}")
-    else:
-        # Save locally
-        file_extension = file.filename.rsplit('.', 1)[1].lower()
-        print(f"[DEBUG] File extension: {file_extension}")
-        collaboration_folder = os.path.join(upload_folder_collaborations, str(collaboration_id))  # Use folder from config
-        print(f"[DEBUG] Local collaboration folder: {collaboration_folder}")
-        os.makedirs(collaboration_folder, exist_ok=True)  # Create directory if it doesn't exist
-        filename = "profile_picture.jpg" if is_edit else f"profile_picture.{file_extension}"
-        print(f"[DEBUG] Filename: {filename}")
-        file_path = os.path.join(collaboration_folder, filename)  # Full path for the file
-        print(f"[DEBUG] File path before saving: {file_path}")
-        file.save(file_path)  # Save file locally
-        print(f"[DEBUG] File saved at: {file_path}")
 
-        # Save only the relative path in the database
-        profile_picture_path = os.path.join(upload_folder_collaborations, str(collaboration_id), filename).replace("\\", "/")
-        print(f"[DEBUG] Relative path stored in DB: {profile_picture_path}")
+        # Generate S3 object name
+        object_name = f"collaborations/{collaboration_id}/profile_pic.{file.filename.rsplit('.', 1)[1].lower()}"
+
+        # Save file to a temporary location
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            file.save(temp_file.name)
+            temp_file_path = temp_file.name
+
+        # Detect content type dynamically
+        content_type, _ = mimetypes.guess_type(temp_file_path)
+        content_type = content_type or "application/octet-stream"
+        print(f"[DEBUG] Using Content-Type: {content_type}")
+
+        # Upload to S3 using put_object
+        with open(temp_file_path, "rb") as file_data:
+            print(f"[DEBUG] Starting upload to S3...")
+            s3.put_object(
+                Bucket=current_app.config['AWS_BUCKET_NAME'],
+                Key=object_name,
+                Body=file_data,
+                ContentType=content_type
+            )
+        profile_picture_path = f"https://{current_app.config['AWS_BUCKET_NAME']}.s3.{current_app.config['AWS_REGION']}.amazonaws.com/{object_name}"
+        print(f"[DEBUG] Uploaded to AWS S3 successfully. URL: {profile_picture_path}")
+
+
+
+    except NoCredentialsError:
+        print("[ERROR] AWS credentials not found.")
+        raise
+    except Exception as e:
+        print(f"[ERROR] Failed to save profile picture: {str(e)}")
+        raise
+    finally:
+        # Clean up temporary file
+            os.unlink(temp_file_path)
 
     return profile_picture_path
 
@@ -152,6 +167,7 @@ def edit_collaboration(collaboration_id):
     except Exception as e:
         print(f"[ERROR] Failed to update collaboration: {e}")
         return jsonify({'error': 'Failed to update collaboration.'}), 500
+
 
 # View all collaborations
 @collaboration_bp.route('/view', methods=['GET'])

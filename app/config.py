@@ -9,7 +9,7 @@ if os.getenv("FLASK_ENV") != "production":
 class Config:
     """Base configuration."""
 
-    # Load and print all environment variables for debugging
+    # General settings
     SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
     print(f"[DEBUG] SECRET_KEY: {SECRET_KEY}")
 
@@ -21,37 +21,29 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-jwt-secret-key")
     print(f"[DEBUG] JWT_SECRET_KEY: {JWT_SECRET_KEY}")
 
-    # Cloudinary configuration
-    CLOUDINARY_URL = os.getenv("CLOUDINARY_URL")
-    print(f"[DEBUG] CLOUDINARY_URL: {CLOUDINARY_URL}")
+    # AWS S3 configuration
+    AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+    AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
+    AWS_BUCKET_NAME = os.getenv("BUCKET_NAME")
+    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+
+    print(f"[DEBUG] AWS_ACCESS_KEY: {AWS_ACCESS_KEY}")
+    print(f"[DEBUG] AWS_BUCKET_NAME: {AWS_BUCKET_NAME}")
+    print(f"[DEBUG] AWS_REGION: {AWS_REGION}")
 
     # Base URL for API calls
     BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")
     print(f"[DEBUG] BASE_URL: {BASE_URL}")
 
-    # Default upload folder structure
-    UPLOAD_FOLDER_COLLABORATIONS = os.getenv("UPLOAD_FOLDER_COLLABORATIONS", "uploads/collaborations")
-    print(f"[DEBUG] UPLOAD_FOLDER_COLLABORATIONS: {UPLOAD_FOLDER_COLLABORATIONS}")
-
-    UPLOAD_FOLDER_PROFILE = os.getenv("UPLOAD_FOLDER_PROFILE", "uploads/users")
-    print(f"[DEBUG] UPLOAD_FOLDER_PROFILE: {UPLOAD_FOLDER_PROFILE}")
-
-    UPLOAD_ITEM_COLLECTION = os.getenv("UPLOAD_ITEM_COLLECTION", "uploads/collections")
-    print(f"[DEBUG] UPLOAD_ITEM_COLLECTION: {UPLOAD_ITEM_COLLECTION}")
-
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     print(f"[DEBUG] ALLOWED_EXTENSIONS: {ALLOWED_EXTENSIONS}")
 
-    # CORS
+    # CORS configuration
     CORS_ORIGINS = [
         origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()
     ]
     print(f"[DEBUG] Raw CORS_ORIGINS from environment: {os.getenv('CORS_ORIGINS')}")
     print(f"[DEBUG] Processed CORS_ORIGINS: {CORS_ORIGINS}")
-
-    # Storage method
-    STORAGE_METHOD = os.getenv("STORAGE_METHOD", "local")
-    print(f"[DEBUG] STORAGE_METHOD: {STORAGE_METHOD}")
 
     # Debug mode
     DEBUG = os.getenv("FLASK_ENV") != "production"

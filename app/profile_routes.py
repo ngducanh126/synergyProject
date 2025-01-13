@@ -1,84 +1,80 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-import os
-import cloudinary.uploader
-import cloudinary.api  # Explicitly import the api submodule
-import cloudinary
+import boto3
+import mimetypes
 import tempfile
+import os
+from botocore.exceptions import NoCredentialsError
+from botocore.config import Config as BotoConfig
+from app.config import Config
 
 profile_bp = Blueprint('profile', __name__)
 
-# Define allowed extensions
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
 def allowed_file(filename):
     """Check if the file has an allowed extension."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
-def save_profile_picture(file, user_id):
-    """Save profile picture based on storage method."""
-    storage_method = current_app.config.get('STORAGE_METHOD', 'local')
-    upload_folder_profile = current_app.config.get('UPLOAD_FOLDER_PROFILE', 'uploads/users')
-    profile_picture_path = None
-
-    print(f"[DEBUG] Storage method: {storage_method}")
-    print(f"[DEBUG] Upload folder (profile): {upload_folder_profile}")
-    print(f"[DEBUG] Received file: {file.filename if file else 'No file received'}")
+def save_file(file, path, s3_object_name=None):
+    """Save a file either locally or to AWS S3 based on the configuration."""
+    file_path = None
 
     try:
-        # Validate the file object and filename
-        if not file or not file.filename:
-            raise ValueError("Invalid file object or filename provided to save_profile_picture")
 
-        # Validate allowed file extensions
-        if not allowed_file(file.filename):
-            raise ValueError(f"Unsupported file type: {file.filename}")
+        # Create S3 client
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=Config.AWS_ACCESS_KEY,
+            aws_secret_access_key=Config.AWS_SECRET_KEY,
+            region_name=Config.AWS_REGION,
+            config=BotoConfig(connect_timeout=5, read_timeout=10, retries={'max_attempts': 3})
+        )
 
-        # Handle cloud storage
-        if storage_method == 'cloudinary':
-            cloudinary_folder = f"users/{user_id}"
-            print(f"[DEBUG] Preparing to upload to Cloudinary. Folder: {cloudinary_folder}")
+        # Save file temporarily
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            file.save(temp_file.name)
+            temp_file_path = temp_file.name
 
-            # Save file to a temporary location
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                file.save(temp_file.name)  # Save the file to the temporary location
-                temp_file_path = temp_file.name
+        # Detect content type
+        content_type, _ = mimetypes.guess_type(temp_file_path)
+        content_type = content_type or "application/octet-stream"
 
-            try:
-                # Upload to Cloudinary using the temporary file path
-                upload_result = cloudinary.uploader.upload(
-                    temp_file_path,
-                    folder=cloudinary_folder,
-                    public_id="profile_pic",  # Save as profile_pic
-                    overwrite=True,
-                    resource_type="image"
-                )
-                profile_picture_path = upload_result.get('secure_url')
-                if not profile_picture_path:
-                    raise ValueError("Cloudinary did not return a secure_url")
-                print(f"[DEBUG] Uploaded to Cloudinary successfully. URL: {profile_picture_path}")
-            finally:
-                os.unlink(temp_file_path)  # Remove the temporary file
-        else:
-            raise ValueError("Unsupported storage method")
+        # Upload to S3
+        with open(temp_file_path, "rb") as file_data:
+            s3.put_object(
+                Bucket=Config.AWS_BUCKET_NAME,
+                Key=s3_object_name,
+                Body=file_data,
+                ContentType=content_type
+            )
+        file_path = f"https://{Config.AWS_BUCKET_NAME}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_object_name}"
+
+        # Clean up temporary file
+        os.unlink(temp_file_path)
+
 
     except Exception as e:
-        print(f"[ERROR] Failed to save profile picture: {str(e)}")
+        print(f"[ERROR] Failed to save file: {e}")
         raise
 
-    return profile_picture_path
+    return file_path
+
+def save_profile_picture(file, entity_id, entity_type='users', is_edit=False):
+    """Save profile picture for a user or collection."""
+    file_extension = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"profile_pic.{file_extension}" if is_edit else file.filename
 
 
+    s3_object_name = f"{entity_type}/{entity_id}/{filename}"
+    return save_file(file, None, s3_object_name)
 
-# View my profile
+
 @profile_bp.route('/view', methods=['GET'])
 @jwt_required()
 def view_profile():
     user_id = get_jwt_identity()
 
     try:
-        # Fetch current user details
         user_query = """
         SELECT id, username, bio, skills, location, availability, verification_status, profile_picture
         FROM users
@@ -89,7 +85,6 @@ def view_profile():
         if not user:
             return jsonify({'message': 'User not found'}), 404
 
-        # Fetch collaborations where the user is a member or admin
         collaborations_query = """
         SELECT c.id, c.name, c.description, 
                CASE 
@@ -133,44 +128,30 @@ def update_profile():
     user_id = get_jwt_identity()
     print(f"[DEBUG] Received request to update profile for user_id: {user_id}")
 
-    # Check if the user exists
     try:
         user_query = "SELECT id FROM users WHERE id = :user_id;"
         user = db.session.execute(user_query, {'user_id': user_id}).fetchone()
         if not user:
-            print("[DEBUG] User not found in the database.")
             return jsonify({'message': 'User not found'}), 404
     except Exception as db_error:
-        print(f"[ERROR] Database query failed: {str(db_error)}")
         return jsonify({'message': 'Database query failed', 'error': str(db_error)}), 500
 
-    # Initialize variables
     bio = request.form.get('bio')
-    skills = request.form.get('skills')  # Assume this is a comma-separated string
+    skills = request.form.get('skills')
     location = request.form.get('location')
     availability = request.form.get('availability')
     file = request.files.get('profile_picture')
 
-    print(f"[DEBUG] Received form data - Bio: {bio}, Skills: {skills}, Location: {location}, Availability: {availability}")
-    print(f"[DEBUG] Received file: {file.filename if file else 'No file received'}")
-
-    # Handle profile picture upload
     profile_picture_path = None
     if file:
         try:
-            print("[DEBUG] Attempting to save profile picture...")
             profile_picture_path = save_profile_picture(file, user_id)
-            print(f"[DEBUG] Profile picture saved at: {profile_picture_path}")
         except Exception as e:
-            print(f"[ERROR] Profile picture upload failed: {str(e)}")
             return jsonify({'message': 'Failed to upload profile picture', 'error': str(e)}), 500
 
-    # Convert skills to PostgreSQL array format
     if skills:
         skills = "{" + ",".join(skill.strip() for skill in skills.split(',')) + "}"
-        print(f"[DEBUG] Converted skills to PostgreSQL array format: {skills}")
 
-    # Update profile data in the database
     update_query = """
     UPDATE users
     SET bio = COALESCE(:bio, bio),
@@ -193,19 +174,9 @@ def update_profile():
             },
         )
         db.session.commit()
-        print("[DEBUG] Profile updated in the database successfully.")
-
-        full_url = (
-            f"{current_app.config['BASE_URL']}/{profile_picture_path}" if profile_picture_path else None
-        )
-        return jsonify({
-            'message': 'Profile updated successfully',
-            'profile_picture_url': full_url
-        }), 200
+        return jsonify({'message': 'Profile updated successfully', 'profile_picture_url': profile_picture_path}), 200
     except Exception as db_error:
-        print(f"[ERROR] Failed to update profile in database: {str(db_error)}")
         return jsonify({'message': 'Failed to update profile', 'error': str(db_error)}), 500
-
 
 
 
@@ -297,71 +268,24 @@ def create_collection():
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to create collection'}), 500
 
-# Add an item to collection
 @profile_bp.route('/collections/<int:collection_id>/items', methods=['POST'])
 @jwt_required()
 def add_item_to_collection(collection_id):
-    """Add an item to a collection."""
     try:
         user_id = get_jwt_identity()
-        print(f"[DEBUG] User ID: {user_id}, Collection ID: {collection_id}")
+        item_type = request.form.get('type')
+        content = request.form.get('content')
+        file = request.files.get('file')
 
-        # Initialize variables
-        item_type = None
-        content = None
         file_path = None
+        if file:
+            original_filename = file.filename
+            s3_object_name = f"collections/{collection_id}/{original_filename}"
+            file_path = save_file(file, None, s3_object_name)
 
-        if 'file' in request.files:
-            # Handle file uploads
-            file = request.files.get('file')
-            item_type = request.form.get('type')
-            content = request.form.get('content')
-            print(f"[DEBUG] Form data (file upload): Type: {item_type}, Content: {content}, File: {file.filename if file else 'None'}")
-
-            if file:
-                # Save the file locally or to Cloudinary
-                storage_method = current_app.config['STORAGE_METHOD']
-                upload_folder_collection = current_app.config['UPLOAD_ITEM_COLLECTION']
-                print(f"[DEBUG] Storage method: {storage_method}")
-
-                file_extension = file.filename.rsplit('.', 1)[1].lower()
-                filename = f"item_{collection_id}_{user_id}.{file_extension}"
-                relative_path = os.path.join(upload_folder_collection, str(collection_id), filename).replace("\\", "/")
-
-                if storage_method == 'cloudinary':
-                    cloudinary_folder = f"collections/{collection_id}"
-                    print(f"[DEBUG] Cloudinary folder: {cloudinary_folder}")
-                    upload_result = cloudinary.uploader.upload(
-                        file,
-                        folder=cloudinary_folder,
-                        public_id=filename.rsplit('.', 1)[0],
-                        overwrite=True,
-                        resource_type="image"
-                    )
-                    file_path = upload_result['secure_url']
-                else:
-                    # Save locally
-                    local_folder = os.path.join(upload_folder_collection, str(collection_id))
-                    os.makedirs(local_folder, exist_ok=True)
-                    full_path = os.path.join(local_folder, filename)
-                    file.save(full_path)
-                    file_path = relative_path
-                    print(f"[DEBUG] File saved locally at: {full_path}")
-            else:
-                print("[DEBUG] No file uploaded.")
-        else:
-            # Handle JSON payloads
-            data = request.get_json()
-            item_type = data.get('type')
-            content = data.get('content')
-            print(f"[DEBUG] JSON data: Type: {item_type}, Content: {content}")
-
-        # Ensure mandatory fields are present
         if not item_type or not content:
-            print("[ERROR] Missing type or content in request")
             return jsonify({'error': 'Type and content are required fields'}), 400
 
-        # Insert into database
         query = """
         INSERT INTO collection_items (collection_id, type, content, file_path)
         VALUES (:collection_id, :type, :content, :file_path)
@@ -370,15 +294,12 @@ def add_item_to_collection(collection_id):
             'collection_id': collection_id,
             'type': item_type,
             'content': content,
-            'file_path': file_path  # Store relative path or Cloudinary URL
+            'file_path': file_path
         })
         db.session.commit()
 
-        print(f"[DEBUG] Item added to database - Type: {item_type}, Content: {content}, File Path: {file_path}")
         return jsonify({'message': 'Item added to collection successfully', 'file_path': file_path}), 201
-
     except Exception as e:
-        print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -464,23 +385,6 @@ def delete_item(collection_id, item_id):
     print(f"[DEBUG] Item deleted: {item_id} from collection_id: {collection_id}")
     return jsonify({'message': 'Item deleted successfully'}), 200
 
-
-@profile_bp.route('/uploads/<path:filename>', methods=['GET'])
-def serve_upload(filename):
-    try:
-        upload_folder = os.path.join(os.getcwd(), 'uploads')
-        file_path = os.path.join(upload_folder, filename)
-        print(f"[DEBUG] File request: {filename}, Full path: {file_path}")
-
-        if not os.path.exists(file_path):
-            print(f"[ERROR] File not found at: {file_path}")
-            return jsonify({'error': 'File not found'}), 404
-
-        print(f"[DEBUG] File exists. Serving: {filename}")
-        return send_from_directory(upload_folder, filename)
-    except Exception as e:
-        print(f"[ERROR] Failed to serve file: {filename}. Error: {e}")
-        return jsonify({'error': 'File not found or inaccessible'}), 404
 
 # getting collections for another user
 @profile_bp.route('/<int:user_id>/collections', methods=['OPTIONS', 'GET'])

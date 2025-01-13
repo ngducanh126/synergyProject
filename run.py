@@ -1,5 +1,3 @@
-import cloudinary
-import cloudinary.api
 from flask_cors import CORS
 from flask import send_from_directory
 from app import create_app, socketio
@@ -20,18 +18,21 @@ CORS(app, resources={
     }
 })
 
-# Cloudinary connection test
-print("[INFO] Testing Cloudinary connection...")
-cloudinary.config(
-    cloud_name="adn56",
-    api_key="924477467695682",
-    api_secret="G57N5CgBQSw0vap-BhXmk6CGNCw"
-)
+# Test AWS S3 connection
+print("[INFO] Testing AWS S3 connection...")
+import boto3
 try:
-    response = cloudinary.api.ping()
-    print("[DEBUG] Cloudinary connection successful:", response)
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=Config.AWS_ACCESS_KEY,
+        aws_secret_access_key=Config.AWS_SECRET_KEY,
+        region_name=Config.AWS_REGION
+    )
+    # List buckets to verify credentials
+    response = s3_client.list_buckets()
+    print("[DEBUG] AWS S3 connection successful. Buckets:", [bucket['Name'] for bucket in response['Buckets']])
 except Exception as e:
-    print("[ERROR] Cloudinary connection failed:", e)
+    print("[ERROR] AWS S3 connection failed:", e)
 
 # Log the environment and allowed CORS origins
 print(f"[INFO] Running in {'production' if os.getenv('FLASK_ENV') == 'production' else 'development'} mode")
