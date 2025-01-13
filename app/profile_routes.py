@@ -45,7 +45,7 @@ def save_file(file, path, s3_object_name=None):
                 Bucket=Config.AWS_BUCKET_NAME,
                 Key=s3_object_name,
                 Body=file_data,
-                ContentType=content_type
+                ContentType=content_type,
             )
         file_path = f"https://{Config.AWS_BUCKET_NAME}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_object_name}"
 
@@ -332,11 +332,14 @@ def get_collection_items(collection_id):
 
         items_data = []
         for item in items:
-            # Ensure the file path is normalized
             if item[3]:  # Check if file_path exists
-                # Dynamically determine the base URL
-                base_url = request.host_url.rstrip('/')  # Removes trailing slash
-                normalized_file_path = f"{base_url}/{item[3]}"  # Prefix with base URL
+                # Use the file_path as is if it already contains a full URL
+                if item[3].startswith("http://") or item[3].startswith("https://"):
+                    normalized_file_path = item[3]
+                else:
+                    # Otherwise, prepend with the base URL dynamically
+                    base_url = request.host_url.rstrip('/')  # Removes trailing slash
+                    normalized_file_path = f"{base_url}/{item[3]}"
             else:
                 normalized_file_path = None
 
@@ -354,6 +357,7 @@ def get_collection_items(collection_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': str(e)}), 500
+
 
 
 # delete one of my collections
