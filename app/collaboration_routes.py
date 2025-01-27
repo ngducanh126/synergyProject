@@ -685,3 +685,9 @@ def transfer_collaboration_ownership(collaboration_id):
     """Transfer ownership of a collaboration to another user."""
     return jsonify({'message': 'Collaboration ownership transferred.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/activity', methods=['GET'])
+@jwt_required()
+def get_collaboration_activity(collaboration_id):
+    """Get recent activity for a collaboration."""
+    return jsonify({'activity': []}), 200
+
