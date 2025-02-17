@@ -388,3 +388,8 @@ def likes():
     except Exception as e:
         print(f"[ERROR] Failed to fetch users who liked user ID {current_user_id}: {e}")
         return jsonify({'message': 'Failed to fetch users who liked you.'}), 500
+@match_bp.route('/block_user/<int:user_id>', methods=['POST'])
+@jwt_required()
+def block_user(user_id):
+    return jsonify({'message': 'User blocked.'}), 200
+
