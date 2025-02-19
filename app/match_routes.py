@@ -393,3 +393,8 @@ def likes():
 def block_user(user_id):
     return jsonify({'message': 'User blocked.'}), 200
 
+@match_bp.route('/unblock_user/<int:user_id>', methods=['POST'])
+@jwt_required()
+def unblock_user(user_id):
+    return jsonify({'message': 'User unblocked.'}), 200
+
