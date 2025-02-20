@@ -488,3 +488,8 @@ def reject_match(match_id):
 def match_history():
     return jsonify({'history': []}), 200
 
+@match_bp.route('/mute_user/<int:user_id>', methods=['POST'])
+@jwt_required()
+def mute_user(user_id):
+    return jsonify({'message': 'User muted.'}), 200
+
