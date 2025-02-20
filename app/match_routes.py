@@ -398,3 +398,8 @@ def block_user(user_id):
 def unblock_user(user_id):
     return jsonify({'message': 'User unblocked.'}), 200
 
+@match_bp.route('/blocked_users', methods=['GET'])
+@jwt_required()
+def get_blocked_users():
+    return jsonify({'blocked_users': []}), 200
+
