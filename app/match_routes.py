@@ -403,3 +403,8 @@ def unblock_user(user_id):
 def get_blocked_users():
     return jsonify({'blocked_users': []}), 200
 
+@match_bp.route('/report_user/<int:user_id>', methods=['POST'])
+@jwt_required()
+def report_user(user_id):
+    return jsonify({'message': 'User reported.'}), 200
+
