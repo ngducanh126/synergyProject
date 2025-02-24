@@ -498,3 +498,8 @@ def mute_user(user_id):
 def unmute_user(user_id):
     return jsonify({'message': 'User unmuted.'}), 200
 
+@match_bp.route('/muted_users', methods=['GET'])
+@jwt_required()
+def get_muted_users():
+    return jsonify({'muted_users': []}), 200
+
