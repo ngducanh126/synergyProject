@@ -408,3 +408,8 @@ def get_blocked_users():
 def report_user(user_id):
     return jsonify({'message': 'User reported.'}), 200
 
+@match_bp.route('/super_like/<int:user_id>', methods=['POST'])
+@jwt_required()
+def super_like_user(user_id):
+    return jsonify({'message': 'Super liked user.'}), 200
+
