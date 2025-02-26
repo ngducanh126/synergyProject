@@ -503,3 +503,8 @@ def unmute_user(user_id):
 def get_muted_users():
     return jsonify({'muted_users': []}), 200
 
+@match_bp.route('/hide_match/<int:match_id>', methods=['POST'])
+@jwt_required()
+def hide_match(match_id):
+    return jsonify({'message': 'Match hidden.'}), 200
+
