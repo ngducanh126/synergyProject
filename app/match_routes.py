@@ -413,3 +413,8 @@ def report_user(user_id):
 def super_like_user(user_id):
     return jsonify({'message': 'Super liked user.'}), 200
 
+@match_bp.route('/undo_swipe/<int:user_id>', methods=['POST'])
+@jwt_required()
+def undo_swipe(user_id):
+    return jsonify({'message': 'Swipe undone.'}), 200
+
