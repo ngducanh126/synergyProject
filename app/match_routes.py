@@ -513,3 +513,8 @@ def hide_match(match_id):
 def unhide_match(match_id):
     return jsonify({'message': 'Match unhidden.'}), 200
 
+@match_bp.route('/hidden_matches', methods=['GET'])
+@jwt_required()
+def get_hidden_matches():
+    return jsonify({'hidden_matches': []}), 200
+
