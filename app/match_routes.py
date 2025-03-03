@@ -423,3 +423,8 @@ def undo_swipe(user_id):
 def recently_viewed():
     return jsonify({'recently_viewed': []}), 200
 
+@match_bp.route('/favorite_user/<int:user_id>', methods=['POST'])
+@jwt_required()
+def favorite_user(user_id):
+    return jsonify({'message': 'User favorited.'}), 200
+
