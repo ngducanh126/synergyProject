@@ -518,3 +518,8 @@ def unhide_match(match_id):
 def get_hidden_matches():
     return jsonify({'hidden_matches': []}), 200
 
+@match_bp.route('/send_gift/<int:user_id>', methods=['POST'])
+@jwt_required()
+def send_gift(user_id):
+    return jsonify({'message': 'Gift sent.'}), 200
+
