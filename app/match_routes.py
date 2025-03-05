@@ -428,3 +428,8 @@ def recently_viewed():
 def favorite_user(user_id):
     return jsonify({'message': 'User favorited.'}), 200
 
+@match_bp.route('/favorites', methods=['GET'])
+@jwt_required()
+def get_favorites():
+    return jsonify({'favorites': []}), 200
+
