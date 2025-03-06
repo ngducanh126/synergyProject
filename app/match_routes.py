@@ -523,3 +523,8 @@ def get_hidden_matches():
 def send_gift(user_id):
     return jsonify({'message': 'Gift sent.'}), 200
 
+@match_bp.route('/received_gifts', methods=['GET'])
+@jwt_required()
+def received_gifts():
+    return jsonify({'gifts': []}), 200
+
