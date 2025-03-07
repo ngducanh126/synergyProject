@@ -433,3 +433,8 @@ def favorite_user(user_id):
 def get_favorites():
     return jsonify({'favorites': []}), 200
 
+@match_bp.route('/remove_favorite/<int:user_id>', methods=['POST'])
+@jwt_required()
+def remove_favorite(user_id):
+    return jsonify({'message': 'Favorite removed.'}), 200
+
