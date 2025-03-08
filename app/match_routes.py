@@ -528,3 +528,8 @@ def send_gift(user_id):
 def received_gifts():
     return jsonify({'gifts': []}), 200
 
+@match_bp.route('/sent_gifts', methods=['GET'])
+@jwt_required()
+def sent_gifts():
+    return jsonify({'gifts': []}), 200
+
