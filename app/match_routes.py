@@ -438,3 +438,8 @@ def get_favorites():
 def remove_favorite(user_id):
     return jsonify({'message': 'Favorite removed.'}), 200
 
+@match_bp.route('/match_activity', methods=['GET'])
+@jwt_required()
+def match_activity():
+    return jsonify({'activity': []}), 200
+
