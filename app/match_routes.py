@@ -443,3 +443,8 @@ def remove_favorite(user_id):
 def match_activity():
     return jsonify({'activity': []}), 200
 
+@match_bp.route('/match_notes/<int:match_id>', methods=['GET'])
+@jwt_required()
+def get_match_notes(match_id):
+    return jsonify({'notes': []}), 200
+
