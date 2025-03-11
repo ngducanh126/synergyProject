@@ -406,4 +406,8 @@ def get_collections_by_user(user_id):
     except Exception as e:
         print(f"[ERROR] {e}")
         return jsonify({'error': 'Failed to fetch collections for the user.'}), 500
-    
+    @profile_bp.route('/verify', methods=['POST'])
+@jwt_required()
+def verify_profile():
+    return jsonify({'message': 'Profile verification requested.'}), 200
+
