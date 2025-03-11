@@ -538,3 +538,8 @@ def sent_gifts():
 def boost_profile():
     return jsonify({'message': 'Profile boosted.'}), 200
 
+@match_bp.route('/profile_boosts', methods=['GET'])
+@jwt_required()
+def profile_boosts():
+    return jsonify({'boosts': []}), 200
+
