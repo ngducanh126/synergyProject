@@ -448,3 +448,8 @@ def match_activity():
 def get_match_notes(match_id):
     return jsonify({'notes': []}), 200
 
+@match_bp.route('/add_match_note/<int:match_id>', methods=['POST'])
+@jwt_required()
+def add_match_note(match_id):
+    return jsonify({'message': 'Note added to match.'}), 200
+
