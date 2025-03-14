@@ -411,3 +411,8 @@ def get_collections_by_user(user_id):
 def verify_profile():
     return jsonify({'message': 'Profile verification requested.'}), 200
 
+@profile_bp.route('/deactivate', methods=['POST'])
+@jwt_required()
+def deactivate_profile():
+    return jsonify({'message': 'Profile deactivated.'}), 200
+
