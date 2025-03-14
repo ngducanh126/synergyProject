@@ -543,3 +543,8 @@ def boost_profile():
 def profile_boosts():
     return jsonify({'boosts': []}), 200
 
+@match_bp.route('/send_message/<int:match_id>', methods=['POST'])
+@jwt_required()
+def send_message(match_id):
+    return jsonify({'message': 'Message sent.'}), 200
+
