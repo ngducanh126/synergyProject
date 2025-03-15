@@ -453,3 +453,8 @@ def get_match_notes(match_id):
 def add_match_note(match_id):
     return jsonify({'message': 'Note added to match.'}), 200
 
+@match_bp.route('/delete_match_note/<int:note_id>', methods=['DELETE'])
+@jwt_required()
+def delete_match_note(note_id):
+    return jsonify({'message': 'Note deleted.'}), 200
+
