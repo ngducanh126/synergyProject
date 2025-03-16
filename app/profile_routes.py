@@ -416,3 +416,8 @@ def verify_profile():
 def deactivate_profile():
     return jsonify({'message': 'Profile deactivated.'}), 200
 
+@profile_bp.route('/reactivate', methods=['POST'])
+@jwt_required()
+def reactivate_profile():
+    return jsonify({'message': 'Profile reactivated.'}), 200
+
