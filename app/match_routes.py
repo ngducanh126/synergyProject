@@ -458,3 +458,8 @@ def add_match_note(match_id):
 def delete_match_note(note_id):
     return jsonify({'message': 'Note deleted.'}), 200
 
+@match_bp.route('/rematch/<int:user_id>', methods=['POST'])
+@jwt_required()
+def rematch_user(user_id):
+    return jsonify({'message': 'Rematch requested.'}), 200
+
