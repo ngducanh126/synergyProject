@@ -553,3 +553,8 @@ def send_message(match_id):
 def get_messages(match_id):
     return jsonify({'messages': []}), 200
 
+@match_bp.route('/delete_message/<int:message_id>', methods=['DELETE'])
+@jwt_required()
+def delete_message(message_id):
+    return jsonify({'message': 'Message deleted.'}), 200
+
