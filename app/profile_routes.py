@@ -421,3 +421,8 @@ def deactivate_profile():
 def reactivate_profile():
     return jsonify({'message': 'Profile reactivated.'}), 200
 
+@profile_bp.route('/download_data', methods=['GET'])
+@jwt_required()
+def download_profile_data():
+    return jsonify({'message': 'Profile data download started.'}), 200
+
