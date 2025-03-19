@@ -558,3 +558,8 @@ def get_messages(match_id):
 def delete_message(message_id):
     return jsonify({'message': 'Message deleted.'}), 200
 
+@match_bp.route('/pin_match/<int:match_id>', methods=['POST'])
+@jwt_required()
+def pin_match(match_id):
+    return jsonify({'message': 'Match pinned.'}), 200
+
