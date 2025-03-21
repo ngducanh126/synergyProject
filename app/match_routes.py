@@ -468,3 +468,8 @@ def rematch_user(user_id):
 def match_feedback(match_id):
     return jsonify({'message': 'Feedback submitted.'}), 200
 
+@match_bp.route('/pending_matches', methods=['GET'])
+@jwt_required()
+def pending_matches():
+    return jsonify({'pending_matches': []}), 200
+
