@@ -431,3 +431,8 @@ def download_profile_data():
 def get_privacy_settings():
     return jsonify({'privacy_settings': {}}), 200
 
+@profile_bp.route('/privacy_settings', methods=['PUT'])
+@jwt_required()
+def update_privacy_settings():
+    return jsonify({'message': 'Privacy settings updated.'}), 200
+
