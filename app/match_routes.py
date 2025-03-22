@@ -563,3 +563,8 @@ def delete_message(message_id):
 def pin_match(match_id):
     return jsonify({'message': 'Match pinned.'}), 200
 
+@match_bp.route('/unpin_match/<int:match_id>', methods=['POST'])
+@jwt_required()
+def unpin_match(match_id):
+    return jsonify({'message': 'Match unpinned.'}), 200
+
