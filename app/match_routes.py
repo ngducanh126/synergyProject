@@ -568,3 +568,8 @@ def pin_match(match_id):
 def unpin_match(match_id):
     return jsonify({'message': 'Match unpinned.'}), 200
 
+@match_bp.route('/pinned_matches', methods=['GET'])
+@jwt_required()
+def get_pinned_matches():
+    return jsonify({'pinned_matches': []}), 200
+
