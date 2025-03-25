@@ -573,3 +573,8 @@ def unpin_match(match_id):
 def get_pinned_matches():
     return jsonify({'pinned_matches': []}), 200
 
+@match_bp.route('/match_statistics', methods=['GET'])
+@jwt_required()
+def match_statistics():
+    return jsonify({'statistics': {}}), 200
+
