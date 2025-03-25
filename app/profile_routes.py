@@ -441,3 +441,8 @@ def update_privacy_settings():
 def get_notification_settings():
     return jsonify({'notification_settings': {}}), 200
 
+@profile_bp.route('/notification_settings', methods=['PUT'])
+@jwt_required()
+def update_notification_settings():
+    return jsonify({'message': 'Notification settings updated.'}), 200
+
