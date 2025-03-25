@@ -478,3 +478,8 @@ def pending_matches():
 def accept_match(match_id):
     return jsonify({'message': 'Match accepted.'}), 200
 
+@match_bp.route('/reject_match/<int:match_id>', methods=['POST'])
+@jwt_required()
+def reject_match(match_id):
+    return jsonify({'message': 'Match rejected.'}), 200
+
