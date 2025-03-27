@@ -578,3 +578,8 @@ def get_pinned_matches():
 def match_statistics():
     return jsonify({'statistics': {}}), 200
 
+@match_bp.route('/profile_views', methods=['GET'])
+@jwt_required()
+def profile_views():
+    return jsonify({'views': 0}), 200
+
