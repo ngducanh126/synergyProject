@@ -483,3 +483,8 @@ def accept_match(match_id):
 def reject_match(match_id):
     return jsonify({'message': 'Match rejected.'}), 200
 
+@match_bp.route('/match_history', methods=['GET'])
+@jwt_required()
+def match_history():
+    return jsonify({'history': []}), 200
+
