@@ -446,3 +446,8 @@ def get_notification_settings():
 def update_notification_settings():
     return jsonify({'message': 'Notification settings updated.'}), 200
 
+@profile_bp.route('/activity_log', methods=['GET'])
+@jwt_required()
+def get_activity_log():
+    return jsonify({'activity_log': []}), 200
+
