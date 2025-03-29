@@ -583,3 +583,8 @@ def match_statistics():
 def profile_views():
     return jsonify({'views': 0}), 200
 
+@match_bp.route('/match_reminders', methods=['GET'])
+@jwt_required()
+def match_reminders():
+    return jsonify({'reminders': []}), 200
+
