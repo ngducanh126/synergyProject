@@ -451,3 +451,8 @@ def update_notification_settings():
 def get_activity_log():
     return jsonify({'activity_log': []}), 200
 
+@profile_bp.route('/change_password', methods=['POST'])
+@jwt_required()
+def change_password():
+    return jsonify({'message': 'Password changed.'}), 200
+
