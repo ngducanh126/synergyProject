@@ -456,3 +456,8 @@ def get_activity_log():
 def change_password():
     return jsonify({'message': 'Password changed.'}), 200
 
+@profile_bp.route('/set_status', methods=['POST'])
+@jwt_required()
+def set_status():
+    return jsonify({'message': 'Status set.'}), 200
+
