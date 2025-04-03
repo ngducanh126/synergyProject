@@ -461,3 +461,8 @@ def change_password():
 def set_status():
     return jsonify({'message': 'Status set.'}), 200
 
+@profile_bp.route('/get_status', methods=['GET'])
+@jwt_required()
+def get_status():
+    return jsonify({'status': 'active'}), 200
+
