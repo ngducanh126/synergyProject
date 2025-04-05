@@ -466,3 +466,8 @@ def set_status():
 def get_status():
     return jsonify({'status': 'active'}), 200
 
+@profile_bp.route('/profile_views', methods=['GET'])
+@jwt_required()
+def get_profile_views():
+    return jsonify({'views': 0}), 200
+
