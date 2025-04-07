@@ -471,3 +471,8 @@ def get_status():
 def get_profile_views():
     return jsonify({'views': 0}), 200
 
+@profile_bp.route('/block_user/<int:user_id>', methods=['POST'])
+@jwt_required()
+def block_user(user_id):
+    return jsonify({'message': 'User blocked.'}), 200
+
