@@ -506,3 +506,8 @@ def delete_account():
 def request_data_removal():
     return jsonify({'message': 'Data removal requested.'}), 200
 
+@profile_bp.route('/add_social_link', methods=['POST'])
+@jwt_required()
+def add_social_link():
+    return jsonify({'message': 'Social link added.'}), 200
+
