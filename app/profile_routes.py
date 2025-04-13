@@ -486,3 +486,8 @@ def unblock_user(user_id):
 def blocked_users():
     return jsonify({'blocked_users': []}), 200
 
+@profile_bp.route('/profile_theme', methods=['PUT'])
+@jwt_required()
+def update_profile_theme():
+    return jsonify({'message': 'Profile theme updated.'}), 200
+
