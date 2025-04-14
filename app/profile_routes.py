@@ -516,3 +516,8 @@ def add_social_link():
 def remove_social_link():
     return jsonify({'message': 'Social link removed.'}), 200
 
+@profile_bp.route('/get_social_links', methods=['GET'])
+@jwt_required()
+def get_social_links():
+    return jsonify({'social_links': []}), 200
+
