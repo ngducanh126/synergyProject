@@ -491,3 +491,8 @@ def blocked_users():
 def update_profile_theme():
     return jsonify({'message': 'Profile theme updated.'}), 200
 
+@profile_bp.route('/profile_theme', methods=['GET'])
+@jwt_required()
+def get_profile_theme():
+    return jsonify({'theme': 'default'}), 200
+
