@@ -496,3 +496,8 @@ def update_profile_theme():
 def get_profile_theme():
     return jsonify({'theme': 'default'}), 200
 
+@profile_bp.route('/delete_account', methods=['DELETE'])
+@jwt_required()
+def delete_account():
+    return jsonify({'message': 'Account deleted.'}), 200
+
