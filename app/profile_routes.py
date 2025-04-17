@@ -521,3 +521,8 @@ def remove_social_link():
 def get_social_links():
     return jsonify({'social_links': []}), 200
 
+@profile_bp.route('/set_profile_visibility', methods=['POST'])
+@jwt_required()
+def set_profile_visibility():
+    return jsonify({'message': 'Profile visibility updated.'}), 200
+
