@@ -501,3 +501,8 @@ def get_profile_theme():
 def delete_account():
     return jsonify({'message': 'Account deleted.'}), 200
 
+@profile_bp.route('/request_data_removal', methods=['POST'])
+@jwt_required()
+def request_data_removal():
+    return jsonify({'message': 'Data removal requested.'}), 200
+
