@@ -526,3 +526,8 @@ def get_social_links():
 def set_profile_visibility():
     return jsonify({'message': 'Profile visibility updated.'}), 200
 
+@profile_bp.route('/get_profile_visibility', methods=['GET'])
+@jwt_required()
+def get_profile_visibility():
+    return jsonify({'visibility': 'public'}), 200
+
