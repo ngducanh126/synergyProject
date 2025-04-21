@@ -531,3 +531,8 @@ def set_profile_visibility():
 def get_profile_visibility():
     return jsonify({'visibility': 'public'}), 200
 
+@profile_bp.route('/add_language', methods=['POST'])
+@jwt_required()
+def add_language():
+    return jsonify({'message': 'Language added.'}), 200
+
