@@ -536,3 +536,8 @@ def get_profile_visibility():
 def add_language():
     return jsonify({'message': 'Language added.'}), 200
 
+@profile_bp.route('/remove_language', methods=['POST'])
+@jwt_required()
+def remove_language():
+    return jsonify({'message': 'Language removed.'}), 200
+
