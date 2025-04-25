@@ -541,3 +541,8 @@ def add_language():
 def remove_language():
     return jsonify({'message': 'Language removed.'}), 200
 
+@profile_bp.route('/get_languages', methods=['GET'])
+@jwt_required()
+def get_languages():
+    return jsonify({'languages': []}), 200
+
