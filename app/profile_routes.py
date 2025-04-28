@@ -551,3 +551,8 @@ def get_languages():
 def add_skill():
     return jsonify({'message': 'Skill added.'}), 200
 
+@profile_bp.route('/remove_skill', methods=['POST'])
+@jwt_required()
+def remove_skill():
+    return jsonify({'message': 'Skill removed.'}), 200
+
