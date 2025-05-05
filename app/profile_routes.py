@@ -566,3 +566,8 @@ def get_skills():
 def add_experience():
     return jsonify({'message': 'Experience added.'}), 200
 
+@profile_bp.route('/remove_experience', methods=['POST'])
+@jwt_required()
+def remove_experience():
+    return jsonify({'message': 'Experience removed.'}), 200
+
