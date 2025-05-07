@@ -571,3 +571,8 @@ def add_experience():
 def remove_experience():
     return jsonify({'message': 'Experience removed.'}), 200
 
+@profile_bp.route('/get_experiences', methods=['GET'])
+@jwt_required()
+def get_experiences():
+    return jsonify({'experiences': []}), 200
+
