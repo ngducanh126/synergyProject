@@ -581,3 +581,8 @@ def get_experiences():
 def add_education():
     return jsonify({'message': 'Education added.'}), 200
 
+@profile_bp.route('/remove_education', methods=['POST'])
+@jwt_required()
+def remove_education():
+    return jsonify({'message': 'Education removed.'}), 200
+
