@@ -591,3 +591,8 @@ def remove_education():
 def get_educations():
     return jsonify({'educations': []}), 200
 
+@profile_bp.route('/add_award', methods=['POST'])
+@jwt_required()
+def add_award():
+    return jsonify({'message': 'Award added.'}), 200
+
