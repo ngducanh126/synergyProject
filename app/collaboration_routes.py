@@ -691,3 +691,8 @@ def get_collaboration_activity(collaboration_id):
     """Get recent activity for a collaboration."""
     return jsonify({'activity': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/mute', methods=['POST'])
+@jwt_required()
+def mute_collaboration(collaboration_id):
+    return jsonify({'message': 'Collaboration muted.'}), 200
+
