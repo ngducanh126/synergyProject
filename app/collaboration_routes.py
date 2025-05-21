@@ -696,3 +696,8 @@ def get_collaboration_activity(collaboration_id):
 def mute_collaboration(collaboration_id):
     return jsonify({'message': 'Collaboration muted.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/unmute', methods=['POST'])
+@jwt_required()
+def unmute_collaboration(collaboration_id):
+    return jsonify({'message': 'Collaboration unmuted.'}), 200
+
