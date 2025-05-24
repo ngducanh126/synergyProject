@@ -711,3 +711,8 @@ def get_muted_collaborations(collaboration_id):
 def star_collaboration(collaboration_id):
     return jsonify({'message': 'Collaboration starred.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/unstar', methods=['POST'])
+@jwt_required()
+def unstar_collaboration(collaboration_id):
+    return jsonify({'message': 'Collaboration unstarred.'}), 200
+
