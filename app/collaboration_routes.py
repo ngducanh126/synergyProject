@@ -716,3 +716,8 @@ def star_collaboration(collaboration_id):
 def unstar_collaboration(collaboration_id):
     return jsonify({'message': 'Collaboration unstarred.'}), 200
 
+@collaboration_bp.route('/starred', methods=['GET'])
+@jwt_required()
+def get_starred_collaborations():
+    return jsonify({'starred_collaborations': []}), 200
+
