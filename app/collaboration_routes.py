@@ -721,3 +721,8 @@ def unstar_collaboration(collaboration_id):
 def get_starred_collaborations():
     return jsonify({'starred_collaborations': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/pin', methods=['POST'])
+@jwt_required()
+def pin_collaboration(collaboration_id):
+    return jsonify({'message': 'Collaboration pinned.'}), 200
+
