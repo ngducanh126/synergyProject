@@ -731,3 +731,8 @@ def pin_collaboration(collaboration_id):
 def unpin_collaboration(collaboration_id):
     return jsonify({'message': 'Collaboration unpinned.'}), 200
 
+@collaboration_bp.route('/pinned', methods=['GET'])
+@jwt_required()
+def get_pinned_collaborations():
+    return jsonify({'pinned_collaborations': []}), 200
+
