@@ -746,3 +746,8 @@ def get_collaboration_reminders(collaboration_id):
 def add_collaboration_reminder(collaboration_id):
     return jsonify({'message': 'Reminder added.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/remove-reminder', methods=['POST'])
+@jwt_required()
+def remove_collaboration_reminder(collaboration_id):
+    return jsonify({'message': 'Reminder removed.'}), 200
+
