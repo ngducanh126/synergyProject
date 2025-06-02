@@ -761,3 +761,8 @@ def get_collaboration_calendar(collaboration_id):
 def get_collaboration_events(collaboration_id):
     return jsonify({'events': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/add-event', methods=['POST'])
+@jwt_required()
+def add_collaboration_event(collaboration_id):
+    return jsonify({'message': 'Event added.'}), 200
+
