@@ -766,3 +766,8 @@ def get_collaboration_events(collaboration_id):
 def add_collaboration_event(collaboration_id):
     return jsonify({'message': 'Event added.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/remove-event', methods=['POST'])
+@jwt_required()
+def remove_collaboration_event(collaboration_id):
+    return jsonify({'message': 'Event removed.'}), 200
+
