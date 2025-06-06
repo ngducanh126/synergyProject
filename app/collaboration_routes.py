@@ -781,3 +781,8 @@ def get_collaboration_files(collaboration_id):
 def add_collaboration_file(collaboration_id):
     return jsonify({'message': 'File added.'}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/remove-file', methods=['POST'])
+@jwt_required()
+def remove_collaboration_file(collaboration_id):
+    return jsonify({'message': 'File removed.'}), 200
+
