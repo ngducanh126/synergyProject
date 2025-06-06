@@ -776,3 +776,8 @@ def remove_collaboration_event(collaboration_id):
 def get_collaboration_files(collaboration_id):
     return jsonify({'files': []}), 200
 
+@collaboration_bp.route('/<int:collaboration_id>/add-file', methods=['POST'])
+@jwt_required()
+def add_collaboration_file(collaboration_id):
+    return jsonify({'message': 'File added.'}), 200
+
